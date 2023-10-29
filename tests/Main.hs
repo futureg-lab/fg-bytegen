@@ -5,7 +5,7 @@ import Test.HUnit
 import qualified System.Exit as Exit
  
 test1 :: Test
-test1 = TestCase (assertEqual "should return 3" ["Hello"] (parse "Hello"))
+test1 = TestCase (assertEqual "should return 3" ["Hello"] (fgParse "Hello"))
  
 tests :: Test
 tests = TestList [TestLabel "test1" test1]
