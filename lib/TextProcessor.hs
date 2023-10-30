@@ -93,16 +93,19 @@ parseTup =
             char ']'
             return $ Tup items
 
+
 {- BINARY OPERATORS -}
 -- Grammar X ::= Y <op> X | Y
 parseBinaryOp :: Parser FgValue -> (FgValue -> FgValue -> FgBinary) -> String -> Parser FgValue
 parseBinaryOp leftParser op tk  = do
-    left <- leftParser
-    many space
-    string tk
-    many space
-    right <- parseBinaryOp leftParser op tk
-    return $ Binary (op left right)
+    let expand = do
+            left <- leftParser
+            many space
+            string tk
+            many space
+            right <- parseBinaryOp leftParser op tk
+            return $ Binary (op left right)
+    try expand <|> leftParser
 
 -- gen_expr  ::= or_expr (..) gen_expr | or_expr
 parseGenExpr :: Parser FgValue
@@ -122,26 +125,26 @@ parserAND = parseBinaryOp parserCompExpr AND "and"
 
 -- comp_expr ::= expr (== | >= | >= | != | < | >) comp_expr | expr
 parserCompExpr :: Parser FgValue
-parserCompExpr =
-    parseBinaryOp parseSimpleExpr AND "and"
-    <|> parseBinaryOp parseSimpleExpr EQU "=="
-    <|> parseBinaryOp parseSimpleExpr NEQ "!="
-    <|> parseBinaryOp parseSimpleExpr LT_ "<"
-    <|> parseBinaryOp parseSimpleExpr LTE "<="
-    <|> parseBinaryOp parseSimpleExpr GT_ ">"
-    <|> parseBinaryOp parseSimpleExpr GTE ">="
+parserCompExpr = -- WHY ???? are <, >, = sepcials?
+        try (bin LTE "<=") <|> bin LT_ "<"
+    <|> try (bin GTE ">=") <|> bin GT_ ">"
+    <|> bin NEQ "!="
+    <|> bin EQU "=="
+    where bin = parseBinaryOp parseSimpleExpr
 
 -- sexpr     ::= term (+| -) sexpr | term
 parseSimpleExpr :: Parser FgValue
 parseSimpleExpr =
-    parseBinaryOp parseTerm PLUS "+"
-    <|> parseBinaryOp parseTerm MINUS "-"
+        bin PLUS "+"
+    <|> bin MINUS "-"
+    where bin = parseBinaryOp parseTerm
 
 -- term      ::= factor (* | /) term | factor
 parseTerm :: Parser FgValue
 parseTerm =
-    parseBinaryOp parseFactor MULT "*"
-    <|> parseBinaryOp parseFactor DIV "/"
+        bin MULT "*"
+    <|> bin DIV "/"
+    where bin = parseBinaryOp parseFactor
 
 -- factor    ::= (gen_expr) | unary
 parseFactor :: Parser FgValue
@@ -154,11 +157,11 @@ parseFactor =
             many space
             char ')'
             return expr
-    try parenth <|> parseGenExpr
+    parenth <|> parseUnary
 
 
 parseBinary :: Parser FgValue
-parseBinary = parseGenExpr
+parseBinary = parseFactor
 
 {- UNARY OPERATORS / OPERANDS -}
 
@@ -176,8 +179,8 @@ parseUnary = parseUnaryOp ReprOf "repr_of"
 
 {- EXPRESSION -}
 parseExpr :: Parser FgValue
--- parseExpr = parseBinary <|> parseUnary
-parseExpr = parseUnary
+parseExpr = parseFactor <|> parseUnary
+-- parseExpr = parseUnary
 
 
 
