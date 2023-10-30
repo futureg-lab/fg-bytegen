@@ -10,8 +10,8 @@ tests = TestList [
         TestCase (assertEqual "parse string" "String \"Hello\"" (readExpr "\"Hello\"")),
         TestCase (assertEqual "symbol: parse dot" "Symbol \".\"" (readExpr ".")),
         TestCase (assertEqual "symbol: parse double dot" "Operator \"..\"" (readExpr "..")),
-        TestCase (assertEqual "parse natural numbeer" "Number 1234.0" (readExpr "1234")),
-        TestCase (assertEqual "parse natural numbeer" "Number \"1234.00701\"" (readExpr "1234.00701")),
+        TestCase (assertEqual "parse simple number" "Number (-1234.0)" (readExpr "-1234")),
+        TestCase (assertEqual "parse decimal number" "Number 213.001701" (readExpr "213.001701")),
         TestCase (assertEqual "empty tup" "Tup []" (readExpr "[]")),
         TestCase (
             assertEqual "nested tup"

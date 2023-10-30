@@ -11,7 +11,7 @@ import GHC.Float
 
 data FgValue = Literal String
     | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]
-    | Number Float                     -- 1234, 1.65 ..
+    | Number Double                    -- 1234, 1.65 ..
     | String String                    -- "(.+)"
     | Bool Bool                        -- Literal false | true -> Bool false | true
     | Operator String                  -- +, -, /, *, not, in, list generator .., ..
@@ -40,27 +40,36 @@ parseLiteral =
             _       -> Literal literal
 
 
+{- NUMBERS -}
+
 parseDigits :: Parser FgValue
 -- equiv. liftM (Number . read) $ many1 digit
 parseDigits = Number . read <$> many1 digit
 
+parseFloat :: Parser FgValue
+parseFloat =
+    do
+        first <- parseDigits
+        char '.'
+        rem <- many digit
+        let Number n =  first
+        let exp = int2Double $ length rem
+        let d = read rem
+        return $ Number (n + (d / (10 ** exp)))
 
--- TODO
--- handle negative numbers with option?
--- parseFloat :: Parser FgValue
--- parseFloat =
---     do
---         Number n <- parseDigits
---         char '.'
---         Number d <- parseDigits
---         let exp = -1 - float2Int (logBase 10 d)
---         return $ Number (n + (d * (10 ** int2Float exp)))
+parseNumber :: Parser FgValue
+parseNumber =
+    do
+        let neg = do
+                char '-'
+                Number x <- positiveNumber
+                return $ Number (-x)
+        try neg <|> try positiveNumber
+    where
+        positiveNumber = try parseFloat <|> parseDigits
 
 
-parseNumber = parseDigits
--- parseNumber :: Parser FgValue
--- parseNumber = try parseFloat <|> parseDigits
-
+{- TUPLES/LIST -}
 
 parseTupItem :: Parser (FgValue, FgValue)
 parseTupItem =
@@ -68,8 +77,10 @@ parseTupItem =
     _s
     item <- parseExpr
     _s
+    -- option (char ',') ?? 
     many (char ',')
     return (Number 0, item)
+
 
 parseTupKeyValue :: Parser (FgValue, FgValue)
 parseTupKeyValue =
@@ -81,6 +92,7 @@ parseTupKeyValue =
     _s >> many (char ',')
     return (key, value)
 
+
 parseTup :: Parser FgValue
 parseTup =
         do
@@ -89,8 +101,11 @@ parseTup =
             char ']'
             return $ Tup items
 
+{- SYMBOLS/OPERATORS -}
+
 symbol :: Parser Char
 symbol = oneOf ".+-/*%<>=(){}"
+
 
 parseSymbol :: Parser FgValue
 parseSymbol =
@@ -131,6 +146,7 @@ readExpr :: String -> String
 readExpr input = case parse parseExpr "unexpected token!" input of
     Left err -> show err
     Right v -> show v
+
 
 fgParse :: String -> [String]
 fgParse x = [x]
