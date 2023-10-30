@@ -8,15 +8,7 @@ import qualified Control.Applicative as Parsec
 import qualified Data.Foldable as Parsec
 import GHC.Float
 
-
-data FgValue = Literal String
-    | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]
-    | Number Double                    -- 1234, 1.65 ..
-    | String String                    -- "(.+)"
-    | Bool Bool                        -- Literal false | true -> Bool false | true
-    | Operator String                  -- +, -, /, *, not, in, list generator .., ..
-    | Symbol String                    -- (, ), {, }, ..
-    deriving (Show, Eq)
+import FgAST
 
 parseString :: Parser FgValue
 parseString =
@@ -101,45 +93,92 @@ parseTup =
             char ']'
             return $ Tup items
 
-{- SYMBOLS/OPERATORS -}
+{- BINARY OPERATORS -}
+-- Grammar X ::= Y <op> X | Y
+parseBinaryOp :: Parser FgValue -> (FgValue -> FgValue -> FgBinary) -> String -> Parser FgValue
+parseBinaryOp leftParser op tk  = do
+    left <- leftParser
+    many space
+    string tk
+    many space
+    right <- parseBinaryOp leftParser op tk
+    return $ Binary (op left right)
 
-symbol :: Parser Char
-symbol = oneOf ".+-/*%<>=(){}"
+-- gen_expr  ::= or_expr (..) gen_expr | or_expr
+parseGenExpr :: Parser FgValue
+parseGenExpr = parseBinaryOp parseOr ListGenerator ".."
+
+-- or_expr   ::= xor_expr (xor) or_expr | xor_expr
+parseOr :: Parser FgValue
+parseOr = parseBinaryOp parserXOR OR "or"
+
+-- xor_expr  ::= and_expr (or) xor_expr | and_expr
+parserXOR :: Parser FgValue
+parserXOR = parseBinaryOp parserAND XOR "xor"
+
+-- and_expr  ::= comp_expr (and) and_expr | expr
+parserAND :: Parser FgValue
+parserAND = parseBinaryOp parserCompExpr AND "and"
+
+-- comp_expr ::= expr (== | >= | >= | != | < | >) comp_expr | expr
+parserCompExpr :: Parser FgValue
+parserCompExpr =
+    parseBinaryOp parseSimpleExpr AND "and"
+    <|> parseBinaryOp parseSimpleExpr EQU "=="
+    <|> parseBinaryOp parseSimpleExpr NEQ "!="
+    <|> parseBinaryOp parseSimpleExpr LT_ "<"
+    <|> parseBinaryOp parseSimpleExpr LTE "<="
+    <|> parseBinaryOp parseSimpleExpr GT_ ">"
+    <|> parseBinaryOp parseSimpleExpr GTE ">="
+
+-- sexpr     ::= term (+| -) sexpr | term
+parseSimpleExpr :: Parser FgValue
+parseSimpleExpr =
+    parseBinaryOp parseTerm PLUS "+"
+    <|> parseBinaryOp parseTerm MINUS "-"
+
+-- term      ::= factor (* | /) term | factor
+parseTerm :: Parser FgValue
+parseTerm =
+    parseBinaryOp parseFactor MULT "*"
+    <|> parseBinaryOp parseFactor DIV "/"
+
+-- factor    ::= (gen_expr) | unary
+parseFactor :: Parser FgValue
+parseFactor =
+    do
+    let parenth = do
+            char '('
+            many space
+            expr <- parseGenExpr
+            many space
+            char ')'
+            return expr
+    try parenth <|> parseGenExpr
 
 
-parseSymbol :: Parser FgValue
-parseSymbol =
-        let symbolAsString = fmap (:[]) symbol
-        in do
-            match <- try (
-                        string ".."
-                    <|> string ">="
-                    <|> string "<="
-                    <|> string "=="
-                ) <|> symbolAsString
-            -- TODO: refactor
-            return $ case match of
-                ".." -> Operator ".."
-                "==" -> Operator "=="
-                "+" -> Operator "+"
-                "-" -> Operator "-"
-                "/" -> Operator "/"
-                "*" -> Operator "*"
-                "=" -> Operator "="
-                "%" -> Operator "%"
-                ">=" -> Operator ">="
-                ">" -> Operator ">"
-                "<=" -> Operator "<="
-                "<" -> Operator "<"
-                s -> Symbol s
+parseBinary :: Parser FgValue
+parseBinary = parseGenExpr
 
+{- UNARY OPERATORS / OPERANDS -}
 
-parseExpr :: Parser FgValue
-parseExpr = parseLiteral
+parseUnaryOp :: (FgValue -> FgUnary) -> String -> Parser FgValue
+parseUnaryOp op tk = string tk >> many space >> Unary . op <$> parseExpr
+
+parseUnary :: Parser FgValue
+parseUnary = parseUnaryOp ReprOf "repr_of"
+    <|> parseUnaryOp NOT "not"
+    <|> parseUnaryOp Negative "-"
+    <|> parseLiteral
     <|> parseString
     <|> parseNumber
-    <|> parseSymbol
     <|> parseTup
+
+{- EXPRESSION -}
+parseExpr :: Parser FgValue
+-- parseExpr = parseBinary <|> parseUnary
+parseExpr = parseUnary
+
 
 
 readExpr :: String -> String
