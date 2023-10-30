@@ -2,18 +2,20 @@ module TextProcessor where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
 import System.Environment
-import Text.Parsec.Token (GenTokenParser(charLiteral))
+import Text.Parsec.Token (GenTokenParser(charLiteral, decimal))
 import Data.List.NonEmpty (some1)
 import qualified Control.Applicative as Parsec
+import qualified Data.Foldable as Parsec
+import GHC.Float
 
 
 data FgValue = Literal String
     | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]
-    | Number Float                      -- 1234, 1.65 ..
-    | String String                     -- "(.+)"
-    | Bool Bool                         -- Literal false | true -> Bool false | true
-    | Operator String                   -- +, -, /, *, not, in, list generator .., ..
-    | Symbol String                     -- (, ), {, }, ..
+    | Number Float                     -- 1234, 1.65 ..
+    | String String                    -- "(.+)"
+    | Bool Bool                        -- Literal false | true -> Bool false | true
+    | Operator String                  -- +, -, /, *, not, in, list generator .., ..
+    | Symbol String                    -- (, ), {, }, ..
     deriving (Show, Eq)
 
 parseString :: Parser FgValue
@@ -38,9 +40,26 @@ parseLiteral =
             _       -> Literal literal
 
 
-parseNumber :: Parser FgValue
+parseDigits :: Parser FgValue
 -- equiv. liftM (Number . read) $ many1 digit
-parseNumber = Number . read <$> many1 digit
+parseDigits = Number . read <$> many1 digit
+
+
+-- TODO
+-- handle negative numbers with option?
+-- parseFloat :: Parser FgValue
+-- parseFloat =
+--     do
+--         Number n <- parseDigits
+--         char '.'
+--         Number d <- parseDigits
+--         let exp = -1 - float2Int (logBase 10 d)
+--         return $ Number (n + (d * (10 ** int2Float exp)))
+
+
+parseNumber = parseDigits
+-- parseNumber :: Parser FgValue
+-- parseNumber = try parseFloat <|> parseDigits
 
 
 parseTupItem :: Parser (FgValue, FgValue)
@@ -49,16 +68,24 @@ parseTupItem =
     _s
     item <- parseExpr
     _s
-    -- try $ string ":"
-    -- next_item <- _s >> parseExpr >> _s
     many (char ',')
     return (Number 0, item)
+
+parseTupKeyValue :: Parser (FgValue, FgValue)
+parseTupKeyValue =
+    let _s = many space in do
+    _s
+    key <- parseExpr
+    _s >> char ':' >> _s
+    value <- parseExpr
+    _s >> many (char ',')
+    return (key, value)
 
 parseTup :: Parser FgValue
 parseTup =
         do
             char '['
-            items <- many parseTupItem
+            items <- try (many parseTupKeyValue) <|> many parseTupItem
             char ']'
             return $ Tup items
 
