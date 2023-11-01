@@ -54,28 +54,32 @@ parseNumberPos = do
 
 {- TUPLES/LIST -}
 
-parseTupItem :: Parser (FgValue, FgValue)
-parseTupItem = do
-    item <- lexeme parseExpr
-    lexeme $ many (char ',')
-    return (Number 0, item)
-
-
-parseTupKeyValue :: Parser (FgValue, FgValue)
-parseTupKeyValue = do
-    key <- lexeme parseExpr
-    lexeme (char ':')
-    value <- lexeme parseExpr
-    lexeme $ many (char ',')
-    return (key, value)
-
-
-parseTup :: Parser FgValue
-parseTup = do
+parseTupSimple :: Parser FgValue
+parseTupSimple = do
+    let v = do
+            item <- lexeme parseExpr
+            return (Number 0, item)
     lexeme $ char '['
-    items <- lexeme $ try (many parseTupKeyValue) <|> many parseTupItem
+    items <- lexeme $ sepBy v (char ',')
+    lexeme $ char ']'
+    return $ Tup [(Number (int2Double n), snd (items !! n))| n <- [0 .. length items - 1]]
+
+parseTupKeyValue :: Parser FgValue
+parseTupKeyValue = do
+    let kv = do 
+            key <- lexeme (parseLiteral <|> parseString <|> parseDigits)
+            lexeme (char ':')
+            value <- lexeme parseExpr
+            return (key, value)
+    lexeme $ char '['
+    items <- lexeme $ sepBy kv (char ',')
     lexeme $ char ']'
     return $ Tup items
+
+parseTup :: Parser FgValue
+parseTup = try parseTupKeyValue <|> parseTupSimple
+
+    
 
 
 {- BINARY OPERATORS -}
@@ -127,22 +131,28 @@ parseTerm = leftAssociative parseFactor [(MULT, "*"), (DIV, "/")]
 parseParenth :: Parser FgValue
 parseParenth = do
     lexeme (char '(')
-    expr <- lexeme parseGenExpr
+    expr <- parseExpr
     lexeme (char ')')
     return expr
 
 parseFactor :: Parser FgValue
-parseFactor = try parseParenth <|> parseUnary
+parseFactor = parseParenth <|> parseUnary
 
 
 
 {- UNARY OPERATORS / OPERANDS -}
 
 parseUnarySpacedOp :: (FgValue -> FgUnary) -> String -> Parser FgValue
-parseUnarySpacedOp op tk = string tk >> many1 space >> Unary . op <$> parseFactor
+parseUnarySpacedOp op tk = do 
+    string tk
+    many1 space
+    lexeme $ Unary . op <$> parseFactor
 
 parseUnaryNegative :: Parser FgValue
-parseUnaryNegative = char '-' >> many space >> Unary . Negative <$> parseFactor
+parseUnaryNegative = do
+    char '-'
+    whitespace
+    lexeme $ Unary . Negative <$> parseFactor
 
 parseUnary :: Parser FgValue
 parseUnary = parseUnarySpacedOp ReprOf "repr_of"
@@ -155,7 +165,7 @@ parseUnary = parseUnarySpacedOp ReprOf "repr_of"
 
 {- EXPRESSION -}
 parseExpr :: Parser FgValue
-parseExpr = lexeme (parseParenth <|> try parseGenExpr <|> parseUnary)
+parseExpr = lexeme (parseParenth <|> parseGenExpr <|> parseUnary)
 
 
 gen :: Parser FgValue -> String -> String

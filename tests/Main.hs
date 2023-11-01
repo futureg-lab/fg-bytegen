@@ -16,11 +16,6 @@ tests = TestList [
         ),
         TestCase (assertEqual "parse decimal number" "Number 213.001701" (readExpr "  213.001701")),
         TestCase (assertEqual "empty tup" "Tup []" (readExpr "[]")),
-        TestCase (
-            assertEqual "nested tup"
-                "Tup [(Number 0.0,Number 1.0),(Number 0.0,Tup [(Literal \"a\",Number 2.0),(Literal \"b\",Number 3.0)]),(Number 0.0,String \"three\")]"
-                (readExpr "[1, [ a   :2,b  : 3], \"three\"]")
-        ),
 
         TestCase (
             assertEqual "simple expression"
@@ -36,7 +31,7 @@ tests = TestList [
 
         TestCase (
             assertEqual "nested tup"
-                "Tup [(Number 0.0,Number 1.0),(Number 0.0,Tup [(Literal \"a\",Number 2.0),(Literal \"b\",Number 3.0)]),(Number 0.0,String \"three\")]"
+                "Tup [(Number 0.0,Number 1.0),(Number 1.0,Tup [(Literal \"a\",Number 2.0),(Literal \"b\",Number 3.0)]),(Number 2.0,String \"three\")]"
                 (readExpr "[1, [ a   :2,b  : 3], \"three\"]")
         )
     ]
