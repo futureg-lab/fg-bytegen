@@ -14,7 +14,7 @@ whitespace :: Parser ()
 whitespace = void $ many space
 
 lexeme :: Parser a -> Parser a
-lexeme p = p <* whitespace
+lexeme p = whitespace >> p
 
 parseString :: Parser FgValue
 parseString = do
@@ -40,31 +40,22 @@ parseDigits :: Parser FgValue
 -- equiv. liftM (Number . read) $ many1 digit
 parseDigits = Number . read <$> lexeme (many1 digit)
 
-parseFloat :: Parser FgValue
-parseFloat = do
-    first <- parseDigits
-    char '.'
-    rem <- many digit
-    let Number n =  first
-    let exp = int2Double $ length rem
-    let d = read rem
-    return $ Number (n + (d / (10 ** exp)))
-
-parseNumber :: Parser FgValue
-parseNumber = do
-    let neg = do
-            char '-'
-            Number x <- positiveNumber
-            return $ Number (-x)
-    try neg <|> try positiveNumber
-    where
-        positiveNumber = try parseFloat <|> parseDigits
-
+parseNumberPos :: Parser FgValue
+parseNumberPos = do
+    let decimal = do
+            first <- lexeme parseDigits
+            char '.'
+            rem <- many digit
+            let Number n =  first
+            let exp = int2Double $ length rem
+            let d = read rem
+            return $ Number (n + (d / (10 ** exp)))
+    try decimal <|> lexeme parseDigits
 
 {- TUPLES/LIST -}
 
 parseTupItem :: Parser (FgValue, FgValue)
-parseTupItem = let _s = whitespace in do
+parseTupItem = do
     item <- lexeme parseExpr
     lexeme $ many (char ',')
     return (Number 0, item)
@@ -82,68 +73,61 @@ parseTupKeyValue = do
 parseTup :: Parser FgValue
 parseTup = do
     lexeme $ char '['
-    items <- try (many parseTupKeyValue) <|> many parseTupItem
+    items <- lexeme $ try (many parseTupKeyValue) <|> many parseTupItem
     lexeme $ char ']'
     return $ Tup items
 
 
 {- BINARY OPERATORS -}
 -- Grammar X ::= Y <op> X | Y
-leftAssociative :: Parser FgValue -> (FgValue -> FgValue -> FgBinary) -> Parser a -> Parser FgValue
-leftAssociative leftParser op token = do
+leftAssociative :: Parser FgValue -> [(FgValue -> FgValue -> FgBinary, String)] -> Parser FgValue
+leftAssociative leftParser opAlternatives = do
     let rightExpansion = do
-            left <- lexeme leftParser
-            lexeme token
-            right <- lexeme parseGenExpr
-            return $ Binary $ op left right
-    try rightExpansion <|> lexeme (try leftParser)
+                left <- lexeme leftParser
+                op <- lexeme $ choice (map (try . string . snd) opAlternatives)
+                right <- leftAssociative leftParser opAlternatives
+                -- prepare return value
+                let operator = fst $ head (filter ((==) op . snd) opAlternatives)
+                return $ Binary $ operator left right
+    try rightExpansion <|> lexeme leftParser
 
 -- gen_expr  ::= or_expr (..) gen_expr | or_expr
 parseGenExpr :: Parser FgValue
-parseGenExpr = leftAssociative parseSimpleExpr ListGenerator (string "..")
+parseGenExpr = leftAssociative parseOr [(ListGenerator, "..")]
 
--- or_expr   ::= xor_expr (xor) or_expr | xor_expr
+-- or_expr   ::= xor_expr ( xor ) or_expr | xor_expr
 parseOr :: Parser FgValue
-parseOr = leftAssociative parserXOR OR (string "or")
+parseOr = leftAssociative parserXOR [(OR, "or ")]
 
--- xor_expr  ::= and_expr (or) xor_expr | and_expr
+-- xor_expr  ::= and_expr ( or ) xor_expr | and_expr
 parserXOR :: Parser FgValue
-parserXOR = leftAssociative parserAND XOR (string "xor")
+parserXOR = leftAssociative parserAND [(XOR, "xor ")]
 
--- and_expr  ::= comp_expr (and) and_expr | expr
+-- and_expr  ::= comp_expr ( and ) and_expr | expr
 parserAND :: Parser FgValue
-parserAND = leftAssociative parserCompExpr AND (string "and")
+parserAND = leftAssociative parserCompExpr [(AND, "and ")]
 
 -- comp_expr ::= expr (== | >= | >= | != | < | >) comp_expr | expr
 parserCompExpr :: Parser FgValue
-parserCompExpr = -- WHY ???? are <, >, = sepcials?
-        bin LTE (string "<=") <|> bin LT_ (char '<')
-    <|> bin GTE (string ">=") <|> bin GT_ (char '>')
-    <|> bin NEQ (string "!=")
-    <|> bin EQU (string "==")
-    where bin = leftAssociative parseSimpleExpr
+parserCompExpr = leftAssociative parseSimpleExpr [
+        (LTE, "<="), (LT_, "<"),
+        (GTE, ">="), (GT_ ,">"),
+        (NEQ, "!="), (EQU, "==")
+    ]
 
 -- sexpr     ::= term (+| -) sexpr | term
 parseSimpleExpr :: Parser FgValue
-parseSimpleExpr =
-        bin PLUS (char '+')
-    <|> bin MINUS (char '-')
-    where bin = leftAssociative parseTerm
+parseSimpleExpr = leftAssociative parseTerm [(PLUS, "+"), (MINUS, "-")]
 
 -- term      ::= factor (* | /) term | factor
 parseTerm :: Parser FgValue
-parseTerm =
-        bin MULT (char '*')
-    <|> bin DIV (char '/')
-    where bin = leftAssociative parseFactor
-
-
+parseTerm = leftAssociative parseFactor [(MULT, "*"), (DIV, "/")]
 
 
 parseParenth :: Parser FgValue
 parseParenth = do
     lexeme (char '(')
-    expr <- parseGenExpr
+    expr <- lexeme parseGenExpr
     lexeme (char ')')
     return expr
 
@@ -155,33 +139,29 @@ parseFactor = try parseParenth <|> parseUnary
 {- UNARY OPERATORS / OPERANDS -}
 
 parseUnarySpacedOp :: (FgValue -> FgUnary) -> String -> Parser FgValue
-parseUnarySpacedOp op tk = string tk >> space >> Unary . op <$> parseFactor
+parseUnarySpacedOp op tk = string tk >> many1 space >> Unary . op <$> parseFactor
 
 parseUnaryNegative :: Parser FgValue
 parseUnaryNegative = char '-' >> many space >> Unary . Negative <$> parseFactor
 
 parseUnary :: Parser FgValue
-parseUnary = lexeme $ parseUnarySpacedOp ReprOf "repr_of"
+parseUnary = parseUnarySpacedOp ReprOf "repr_of"
     <|> parseUnarySpacedOp NOT "not"
     <|> parseUnaryNegative
     <|> parseLiteral
     <|> parseString
-    <|> parseNumber
+    <|> parseNumberPos
     <|> parseTup
 
 {- EXPRESSION -}
 parseExpr :: Parser FgValue
-parseExpr = try whitespace >> (
-            try parseParenth
-        <|> try parseGenExpr
-        <|> parseUnary
-    )
+parseExpr = lexeme (parseParenth <|> try parseGenExpr <|> parseUnary)
 
-readExpr :: String -> String
-readExpr input = case parse parseExpr "unexpected token!" input of
+
+gen :: Parser FgValue -> String -> String
+gen p input = case parse p "unexpected token!" input of
     Left err -> show err
     Right v -> show v
 
-
-fgParse :: String -> [String]
-fgParse x = [x]
+readExpr :: String -> String
+readExpr = gen parseExpr
