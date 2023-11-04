@@ -5,4 +5,4 @@ import TextProcessor
 main :: IO ()
 main = do 
     (expr:_) <- getArgs
-    putStrLn (readExpr expr)
+    putStrLn (readProg expr)

@@ -17,9 +17,6 @@ whitespace = void $ many space
 lexeme :: Parser a -> Parser a
 lexeme p = whitespace >> p
 
-constant :: String -> Parser String
-constant = lexeme . string
-
 parseString :: Parser FgValue
 parseString = do
     lexeme $ char '"'
@@ -35,7 +32,7 @@ parseLiteral = let underscore = char '_' in do
     return $ case literal of
         "false" -> Bool False
         "true"  -> Bool True
-        _       -> Lit $ Literal literal
+        _       -> Literal literal
 
 
 {- NUMBERS -}
@@ -59,6 +56,7 @@ parseTupSimple :: Parser FgValue
 parseTupSimple = do
     let v = do
             item <- lexeme parseExpr
+            void whitespace
             return (Number 0, item)
     lexeme $ char '['
     items <- lexeme $ sepBy v (char ',')
@@ -71,6 +69,7 @@ parseTupKeyValue = do
             key <- lexeme (parseLiteral <|> parseString <|> parseDigits)
             lexeme (char ':')
             value <- lexeme parseExpr
+            void whitespace
             return (key, value)
     lexeme $ char '['
     items <- lexeme $ sepBy kv (char ',')
@@ -115,7 +114,7 @@ parseParenth = do
 
 
 parseFactor :: Parser FgValue
-parseFactor = do 
+parseFactor = do
     ret <- try parseParenth <|> parseUnary
     whitespace -- binOp patch
     return ret
@@ -147,13 +146,108 @@ parseUnary = parseUnarySpacedOp ReprOf "repr_of"
 
 {- EXPRESSION -}
 parseExpr :: Parser FgValue
-parseExpr = try (lexeme parseGenExpr) <|> parseUnary
+parseExpr = lexeme parseGenExpr
 
+
+{- INSTRUCTION -}
+
+terminalSymb :: Parser ()
+terminalSymb = lexeme (void $ many1 (char ';'))
+
+parseRootExpr :: Parser FgInstr
+parseRootExpr = do
+    expr <- lexeme parseExpr
+    terminalSymb
+    return $ RootExpr expr
+
+parseRootBlock :: Parser FgInstr
+parseRootBlock = do
+    block <- lexeme parseBlock
+    return $ RootBlock block
+
+parseReturn :: Parser FgInstr
+parseReturn = do
+    lexeme $ string "ret"
+    expr <- lexeme parseExpr;
+    terminalSymb
+    return $ Return expr
+
+fromLiteral :: FgValue -> String
+fromLiteral (Literal x) = x
+fromLiteral _ = error "fatal: failed unwrapping non-literal token"
+
+parseType :: Parser FgType
+parseType = do
+    lit <- fromLiteral <$> lexeme parseLiteral
+    return $ TypeNative lit
+
+parseVariable :: Parser FgVariable
+parseVariable = do
+    tpe <- lexeme parseType
+    many1 $ char ' '
+    varName <- fromLiteral <$> lexeme parseLiteral
+    return $ Var { vName=varName, vType=tpe }
+
+parseVariableDecl :: Parser FgInstr
+parseVariableDecl = do
+    var <- lexeme parseVariable
+    lexeme $ char '='
+    expr <- parseExpr
+    terminalSymb
+    return $ VarDecl var expr
+
+parseBlock :: Parser FgBlock
+parseBlock = do
+    lexeme $ char '{'
+    instrs <- many (try parseInstruction)
+    lexeme $ char '}'
+    return $ Block instrs
+
+parseFunDecl :: Parser FgInstr
+parseFunDecl = do
+    -- func name
+    lexeme $ string "fn"
+    many1 $ char ' '
+    lit <- fmap fromLiteral (lexeme parseLiteral)
+    -- args
+    let argUnit = do
+            item <- lexeme parseVariable
+            void whitespace
+            return item
+    lexeme $ char '('
+    args <- sepBy argUnit (char ',')
+    lexeme $ char ')'
+    -- func output
+    lexeme $ string "->"
+    outType <- lexeme parseType
+    -- func body
+    let emptyBody = do
+            terminalSymb
+            return $ Block []
+    body <- try parseBlock <|> emptyBody
+    return $ FunDecl {
+         fnName=lit
+        ,fnOutType=outType
+        ,fnArgs=args
+        ,fnBody=body
+    }
+
+parseInstruction = try parseRootBlock
+    <|> try parseVariableDecl
+    <|> try parseFunDecl
+    <|> try parseReturn
+    <|> parseRootExpr;
+
+parseProgram = parseInstruction
 
 gen :: Parser FgValue -> String -> String
 gen p input = case parse p "unexpected token!" input of
     Left err -> show err
     Right v -> show v
-
 readExpr :: String -> String
 readExpr = gen parseExpr
+
+readProg :: String -> String
+readProg input = case parse parseProgram "unexpected token!" input of
+    Left err -> show err
+    Right v -> show v

@@ -1,10 +1,6 @@
 module FgAST where
 
-
-newtype FgLiteral = Literal String
-    deriving (Show, Eq)
-
-data FgValue = Lit FgLiteral
+data FgValue = Literal String
     | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]
     | Number Double                    -- 1234, 1.65 ..
     | String String                    -- "(.+)"
@@ -36,11 +32,24 @@ data FgUnary = NOT FgValue
     | Negative FgValue
     deriving (Show, Eq)
 
-data FgType = TypeNum | TypeStr | TypeTup  | TypeAuto
+newtype FgType = TypeNative String
     deriving (Show, Eq)
 
-data FgVariable = Var FgType FgLiteral
+newtype FgBlock = Block [FgInstr]
     deriving (Show, Eq)
 
-data FgInstr = VarDecl FgVariable | FunDecl (FgLiteral, FgType) [FgVariable] 
+data FgVariable = Var { vName :: String, vType :: FgType }
+    deriving (Show, Eq)
+
+
+data FgInstr = RootExpr FgValue
+    | RootBlock FgBlock
+    | Return FgValue
+    | VarDecl FgVariable FgValue
+    | FunDecl {
+             fnName :: String
+            ,fnOutType :: FgType
+            ,fnArgs :: [FgVariable]
+            ,fnBody :: FgBlock
+        }
     deriving (Show, Eq)
