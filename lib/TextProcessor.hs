@@ -47,13 +47,10 @@ parseDigits = Number . read <$> lexeme (many1 digit)
 parseNumberPos :: Parser FgValue
 parseNumberPos = do
     let decimal = do
-            first <- lexeme parseDigits
-            char '.'
-            rem <- many digit
-            let Number n =  first
-            let exp = int2Double $ length rem
-            let d = read rem
-            return $ Number (n + (d / (10 ** exp)))
+            first <- lexeme (many1 digit)
+            void $ char '.'
+            second <- many1 digit
+            return $ (Number . read) (first ++ "." ++ second)
     try decimal <|> lexeme parseDigits
 
 {- TUPLES/LIST -}
