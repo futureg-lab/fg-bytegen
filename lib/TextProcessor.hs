@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module TextProcessor where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -6,15 +7,22 @@ import Data.List.NonEmpty (some1)
 import qualified Control.Applicative as Parsec
 import qualified Data.Foldable as Parsec
 import GHC.Float
+import Text.Parsec.Expr
 
 import FgAST
+
+
 import Control.Monad
+import Text.Parsec (Parsec)
 
 whitespace :: Parser ()
 whitespace = void $ many space
 
 lexeme :: Parser a -> Parser a
 lexeme p = whitespace >> p
+
+constant :: String -> Parser String
+constant = lexeme . string
 
 parseString :: Parser FgValue
 parseString = do
@@ -66,7 +74,7 @@ parseTupSimple = do
 
 parseTupKeyValue :: Parser FgValue
 parseTupKeyValue = do
-    let kv = do 
+    let kv = do
             key <- lexeme (parseLiteral <|> parseString <|> parseDigits)
             lexeme (char ':')
             value <- lexeme parseExpr
@@ -79,53 +87,30 @@ parseTupKeyValue = do
 parseTup :: Parser FgValue
 parseTup = try parseTupKeyValue <|> parseTupSimple
 
-    
-
-
 {- BINARY OPERATORS -}
--- Grammar X ::= Y <op> X | Y
-leftAssociative :: Parser FgValue -> [(FgValue -> FgValue -> FgBinary, String)] -> Parser FgValue
-leftAssociative leftParser opAlternatives = do
-    let rightExpansion = do
-                left <- lexeme leftParser
-                op <- lexeme $ choice (map (try . string . snd) opAlternatives)
-                right <- leftAssociative leftParser opAlternatives
-                -- prepare return value
-                let operator = fst $ head (filter ((==) op . snd) opAlternatives)
-                return $ Binary $ operator left right
-    try rightExpansion <|> lexeme leftParser
 
--- gen_expr  ::= or_expr (..) gen_expr | or_expr
-parseGenExpr :: Parser FgValue
-parseGenExpr = leftAssociative parseOr [(ListGenerator, "..")]
-
--- or_expr   ::= xor_expr ( xor ) or_expr | xor_expr
-parseOr :: Parser FgValue
-parseOr = leftAssociative parserXOR [(OR, "or ")]
-
--- xor_expr  ::= and_expr ( or ) xor_expr | and_expr
-parserXOR :: Parser FgValue
-parserXOR = leftAssociative parserAND [(XOR, "xor ")]
-
--- and_expr  ::= comp_expr ( and ) and_expr | expr
-parserAND :: Parser FgValue
-parserAND = leftAssociative parserCompExpr [(AND, "and ")]
-
--- comp_expr ::= expr (== | >= | >= | != | < | >) comp_expr | expr
-parserCompExpr :: Parser FgValue
-parserCompExpr = leftAssociative parseSimpleExpr [
-        (LTE, "<="), (LT_, "<"),
-        (GTE, ">="), (GT_ ,">"),
-        (NEQ, "!="), (EQU, "==")
-    ]
-
--- sexpr     ::= term (+| -) sexpr | term
-parseSimpleExpr :: Parser FgValue
-parseSimpleExpr = leftAssociative parseTerm [(PLUS, "+"), (MINUS, "-")]
-
--- term      ::= factor (* | /) term | factor
-parseTerm :: Parser FgValue
-parseTerm = leftAssociative parseFactor [(MULT, "*"), (DIV, "/")]
+parseGenExpr :: Parsec String () FgValue
+parseGenExpr = buildExpressionParser [
+       [binary MULT "*" AssocLeft]
+      ,[binary DIV "/" AssocLeft]
+      ,[binary PLUS "+" AssocLeft]
+      ,[binary MINUS "-" AssocLeft]
+      ,[binary AND "and" AssocLeft]
+      ,[binary OR "or" AssocLeft]
+      ,[binary EQU "==" AssocLeft]
+    --   ,[binary ASSIGN "=" AssocLeft]
+      ,[binary LTE "<=" AssocLeft]
+    --   ,[binary LT_ "<" AssocLeft]
+      ,[binary GTE ">=" AssocLeft]
+    --   ,[binary GT_ ">" AssocLeft]
+      ,[binary ListGenerator ".." AssocLeft]
+   ] (lexeme parseFactor)
+   where
+        binOp op x y = Binary $ op x y
+        binary op c = Infix (do
+                void $ string c
+                return $ binOp op
+            )
 
 
 parseParenth :: Parser FgValue
@@ -135,15 +120,19 @@ parseParenth = do
     lexeme (char ')')
     return expr
 
+
 parseFactor :: Parser FgValue
-parseFactor = parseParenth <|> parseUnary
+parseFactor = do 
+    ret <- try parseParenth <|> parseUnary
+    whitespace -- binOp patch
+    return ret
 
 
 
 {- UNARY OPERATORS / OPERANDS -}
 
 parseUnarySpacedOp :: (FgValue -> FgUnary) -> String -> Parser FgValue
-parseUnarySpacedOp op tk = do 
+parseUnarySpacedOp op tk = do
     string tk
     many1 space
     lexeme $ Unary . op <$> parseFactor
@@ -165,7 +154,7 @@ parseUnary = parseUnarySpacedOp ReprOf "repr_of"
 
 {- EXPRESSION -}
 parseExpr :: Parser FgValue
-parseExpr = lexeme (parseParenth <|> parseGenExpr <|> parseUnary)
+parseExpr = try (lexeme parseGenExpr) <|> parseUnary
 
 
 gen :: Parser FgValue -> String -> String
