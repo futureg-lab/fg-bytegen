@@ -50,6 +50,8 @@ parseNumberPos = do
             return $ (Number . read) (first ++ "." ++ second)
     try decimal <|> lexeme parseDigits
 
+
+
 {- TUPLES/LIST -}
 
 parseTupSimple :: Parser FgValue
@@ -74,14 +76,14 @@ parseTupKeyValue = do
             void whitespace
             return (key, value)
     lexeme $ char '['
-    whitespace
     items <- lexeme $ sepBy kv (char ',')
-    whitespace
     lexeme $ char ']'
     return $ Tup items
 
 parseTup :: Parser FgValue
 parseTup = try parseTupKeyValue <|> parseTupSimple
+
+
 
 {- BINARY OPERATORS -}
 
@@ -108,7 +110,6 @@ parseGenExpr = buildExpressionParser [
                 return $ binOp op
             )
 
-
 parseParenth :: Parser FgValue
 parseParenth = do
     lexeme (char '(')
@@ -125,7 +126,7 @@ parseFactor = do
 
 
 
-{- UNARY OPERATORS / OPERANDS -}
+{- EXPRESSION -}
 
 parseUnarySpacedOp :: (FgValue -> FgUnary) -> String -> Parser FgValue
 parseUnarySpacedOp op tk = do
@@ -148,9 +149,9 @@ parseUnary = parseUnarySpacedOp ReprOf "repr_of"
     <|> parseNumberPos
     <|> parseTup
 
-{- EXPRESSION -}
 parseExpr :: Parser FgValue
 parseExpr = lexeme parseGenExpr
+
 
 
 {- INSTRUCTION -}
@@ -219,9 +220,7 @@ parseFunDecl = do
             void whitespace
             return item
     lexeme $ char '('
-    whitespace
-    args <- sepBy argUnit (char ',')
-    whitespace
+    args <- lexeme $ sepBy argUnit (char ',')
     lexeme $ char ')'
     -- func output
     lexeme $ string "->"
@@ -238,12 +237,14 @@ parseFunDecl = do
         ,fnBody=body
     }
 
+parseInstruction :: Parser FgInstr
 parseInstruction = try parseRootBlock
     <|> try parseVariableDecl
     <|> try parseFunDecl
     <|> try parseReturn
     <|> parseRootExpr;
 
+parseProgram :: Parser FgInstr
 parseProgram = parseInstruction
 
 gen :: Parser FgValue -> String -> String

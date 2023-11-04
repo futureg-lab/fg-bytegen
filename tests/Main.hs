@@ -12,10 +12,10 @@ tests = TestList [
         TestCase (
             assertEqual "parse unary operator"
                 "Unary (Negative (Unary (NOT (Unary (NOT (Tup [(Number 0.0,Number 1.0)]))))))"
-                (readExpr "- not not [1]")
+                (readExpr "- not not\n[1]")
         ),
         TestCase (assertEqual "parse decimal number" "Number 213.001701" (readExpr "  213.001701")),
-        TestCase (assertEqual "empty tup" "Tup []" (readExpr "[]")),
+        TestCase (assertEqual "empty tup" "Tup []" (readExpr "[\n]")),
 
         TestCase (
             assertEqual "simple expression"
@@ -38,7 +38,7 @@ tests = TestList [
         TestCase (
             assertEqual "parse root expression"
                 "RootExpr (Binary (MULT (Unary (NOT (Binary (MINUS (Literal \"x\") (Number 1.0))))) (Unary (Negative (Number 3.7)))))"
-                (readProg " not (x - 1) * -3.7;")
+                (readProg " not (x \n- 1) * -\t3.7;")
         ),
 
         TestCase (
@@ -50,7 +50,7 @@ tests = TestList [
         TestCase (
             assertEqual "parse root block"
                 "RootBlock (Block [RootBlock (Block [VarDecl (Var {vName = \"x\", vType = TypeNative \"tup\"}) (Tup [])])])"
-                (readProg "{ \n\t{tup   x = [];} } ")
+                (readProg "{ \n\t{tup   x = [\n];} } ")
         ),
 
         TestCase (
