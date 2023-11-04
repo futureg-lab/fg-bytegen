@@ -19,19 +19,19 @@ tests = TestList [
 
         TestCase (
             assertEqual "simple expression"
-                "Binary (ListGenerator (Number 1.0) (Binary (AND (Unary (Negative (Number 2.0))) (Binary (MULT (Number 3.0) (Binary (MINUS (Literal \"x\") (Number 1.0))))))))"
+                "Binary (ListGenerator (Number 1.0) (Binary (AND (Unary (Negative (Number 2.0))) (Binary (MULT (Number 3.0) (Binary (MINUS (Lit (Literal \"x\")) (Number 1.0))))))))"
                 (readExpr "1 .. -2 and 3 * (x - 1)")
         ),
 
         TestCase (
             assertEqual "parse complex expression"
-                "Binary (EQU (Unary (ReprOf (Binary (PLUS (Literal \"x\") (Literal \"y\"))))) (Binary (MULT (Number 5.0) (Unary (Negative (Binary (PLUS (Unary (NOT (Unary (NOT (Unary (NOT (Unary (Negative (Number 4.0))))))))) (Number 8.0))))))))"
+                "Binary (EQU (Unary (ReprOf (Binary (PLUS (Lit (Literal \"x\")) (Lit (Literal \"y\")))))) (Binary (MULT (Number 5.0) (Unary (Negative (Binary (PLUS (Unary (NOT (Unary (NOT (Unary (NOT (Unary (Negative (Number 4.0))))))))) (Number 8.0))))))))"
                 (readExpr "repr_of (x + y) == 5*-(not (not not -4) + 8) ")
         ),
 
         TestCase (
             assertEqual "nested tup"
-                "Tup [(Number 0.0,Number 1.0),(Number 1.0,Tup [(Literal \"a\",Number 2.0),(Literal \"b\",Number 3.0)]),(Number 2.0,String \"three\")]"
+                "Tup [(Number 0.0,Number 1.0),(Number 1.0,Tup [(Lit (Literal \"a\"),Number 2.0),(Lit (Literal \"b\"),Number 3.0)]),(Number 2.0,String \"three\")]"
                 (readExpr "[1, [ a   :2,b  : 3], \"three\"]")
         )
     ]

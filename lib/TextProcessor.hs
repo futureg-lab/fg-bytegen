@@ -35,7 +35,7 @@ parseLiteral = let underscore = char '_' in do
     return $ case literal of
         "false" -> Bool False
         "true"  -> Bool True
-        _       -> Literal literal
+        _       -> Lit $ Literal literal
 
 
 {- NUMBERS -}

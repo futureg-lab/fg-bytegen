@@ -1,6 +1,10 @@
 module FgAST where
 
-data FgValue = Literal String
+
+newtype FgLiteral = Literal String
+    deriving (Show, Eq)
+
+data FgValue = Lit FgLiteral
     | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]
     | Number Double                    -- 1234, 1.65 ..
     | String String                    -- "(.+)"
@@ -32,5 +36,11 @@ data FgUnary = NOT FgValue
     | Negative FgValue
     deriving (Show, Eq)
 
-data Operation = FgBinary | FgUnary
+data FgType = TypeNum | TypeStr | TypeTup  | TypeAuto
+    deriving (Show, Eq)
+
+data FgVariable = Var FgType FgLiteral
+    deriving (Show, Eq)
+
+data FgInstr = VarDecl FgVariable | FunDecl (FgLiteral, FgType) [FgVariable] 
     deriving (Show, Eq)
