@@ -59,7 +59,9 @@ parseTupSimple = do
             void whitespace
             return (Number 0, item)
     lexeme $ char '['
+    whitespace
     items <- lexeme $ sepBy v (char ',')
+    whitespace
     lexeme $ char ']'
     return $ Tup [(Number (int2Double n), snd (items !! n))| n <- [0 .. length items - 1]]
 
@@ -72,7 +74,9 @@ parseTupKeyValue = do
             void whitespace
             return (key, value)
     lexeme $ char '['
+    whitespace
     items <- lexeme $ sepBy kv (char ',')
+    whitespace
     lexeme $ char ']'
     return $ Tup items
 
@@ -215,7 +219,9 @@ parseFunDecl = do
             void whitespace
             return item
     lexeme $ char '('
+    whitespace
     args <- sepBy argUnit (char ',')
+    whitespace
     lexeme $ char ')'
     -- func output
     lexeme $ string "->"

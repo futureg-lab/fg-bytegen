@@ -32,7 +32,7 @@ tests = TestList [
         TestCase (
             assertEqual "nested tup"
                 "Tup [(Number 0.0,Number 1.0),(Number 1.0,Tup [(Literal \"a\",Number 2.0),(Literal \"b\",Number 3.0)]),(Number 2.0,String \"three\")]"
-                (readExpr "[1, [ a   :2,b  : 3], \"three\"]")
+                (readExpr "[1,\n [ \na   :2,\n\t\nb  : 3], \"three\"]")
         ),
 
         TestCase (
@@ -50,19 +50,19 @@ tests = TestList [
         TestCase (
             assertEqual "parse root block"
                 "RootBlock (Block [RootBlock (Block [VarDecl (Var {vName = \"x\", vType = TypeNative \"tup\"}) (Tup [])])])"
-                (readProg "{ {tup   x = [];} } ")
+                (readProg "{ \n\t{tup   x = [];} } ")
         ),
 
         TestCase (
             assertEqual "parse function declaration"
                 "FunDecl {fnName = \"hello\", fnOutType = TypeNative \"auto\", fnArgs = [Var {vName = \"name\", vType = TypeNative \"str\"},Var {vName = \"age\", vType = TypeNative \"num\"}], fnBody = Block []}"
-                (readProg " fn  hello(str name, num age) -> auto;")
+                (readProg " fn  \nhello(\n str name ,\nnum age) -> auto\n;")
         ),
 
         TestCase (
             assertEqual "parse function declaration with body"
                 "FunDecl {fnName = \"aaa\", fnOutType = TypeNative \"auto\", fnArgs = [], fnBody = Block [RootBlock (Block []),Return (Binary (OR (Bool False) (Bool True)))]}"
-                (readProg " fn aaa() -> auto { {} ret false or true; }")
+                (readProg " fn \taaa(\n\n\t)\n ->\t auto\n { {\n\r\n} \nret false or true; }")
         )
     ]
 
