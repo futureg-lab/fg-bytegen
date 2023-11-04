@@ -2,10 +2,6 @@
 module TextProcessor where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
-import System.Environment
-import Data.List.NonEmpty (some1)
-import qualified Control.Applicative as Parsec
-import qualified Data.Foldable as Parsec
 import GHC.Float
 import Text.Parsec.Expr
 
