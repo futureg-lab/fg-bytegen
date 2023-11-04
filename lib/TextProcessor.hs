@@ -4,12 +4,10 @@ module TextProcessor where
 import Text.ParserCombinators.Parsec hiding (spaces)
 import GHC.Float
 import Text.Parsec.Expr
-
-import FgAST
-
-
 import Control.Monad
 import Text.Parsec (Parsec)
+
+import FgAST
 
 whitespace :: Parser ()
 whitespace = void $ many space
