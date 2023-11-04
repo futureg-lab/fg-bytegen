@@ -94,17 +94,17 @@ parseGenExpr = buildExpressionParser [
       ,[binary AND "and" AssocLeft]
       ,[binary OR "or" AssocLeft]
       ,[binary EQU "==" AssocLeft]
-    --   ,[binary ASSIGN "=" AssocLeft]
       ,[binary LTE "<=" AssocLeft]
-    --   ,[binary LT_ "<" AssocLeft]
+      ,[binary LT_ "<" AssocLeft]
       ,[binary GTE ">=" AssocLeft]
-    --   ,[binary GT_ ">" AssocLeft]
+      ,[binary GT_ ">" AssocLeft]
       ,[binary ListGenerator ".." AssocLeft]
+      ,[binary ASSIGN "=" AssocLeft]
    ] (lexeme parseFactor)
    where
         binOp op x y = Binary $ op x y
         binary op c = Infix (do
-                void $ string c
+                void $ try $ string c -- backtrack
                 return $ binOp op
             )
 

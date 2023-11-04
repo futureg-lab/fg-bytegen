@@ -15,7 +15,7 @@ data FgBinary = PLUS FgValue FgValue
     | DIV FgValue FgValue
     | EQU FgValue FgValue
     | NEQ FgValue FgValue
-    -- | ASSIGN FgValue FgValue
+    | ASSIGN FgValue FgValue
     | GT_ FgValue FgValue
     | GTE FgValue FgValue
     | LT_ FgValue FgValue
