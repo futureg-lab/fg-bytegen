@@ -11,14 +11,20 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v3
     - uses: haskell-actions/setup@v2
       with:
         ghc-version: '9.4.7'
-        cabal-version: '3.6'
+        cabal-version: '3.6.2'
 
     - name: Cache
       uses: actions/cache@v3
