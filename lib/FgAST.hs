@@ -25,7 +25,7 @@ data FgBinary = PLUS FgValue FgValue
     | OR FgValue FgValue
     | AND FgValue FgValue
     | XOR FgValue FgValue
-    | IN (FgValue, FgValue) FgValue  -- k, v in x
+    | MOD FgValue FgValue
     | ListGenerator FgValue FgValue  -- a .. b
     deriving (Show, Eq)
 
@@ -48,10 +48,18 @@ data FgInstr = RootExpr FgValue
     | RootBlock FgBlock
     | Return FgValue
     | VarDecl FgVariable FgValue
+    | WhileLoop FgValue FgBlock
+    | ForLoop {
+         forItem:: (Maybe String, String)
+        ,forIterator :: FgValue
+        ,forBlock :: FgBlock
+    }
     | FunDecl {
              fnName :: String
             ,fnOutType :: FgType
             ,fnArgs :: [FgVariable]
             ,fnBody :: FgBlock
         }
+    | LoopBreak
+    | LoopContinue
     deriving (Show, Eq)

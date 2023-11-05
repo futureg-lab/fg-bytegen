@@ -43,8 +43,8 @@ tests = TestList [
 
         TestCase (
             assertEqual "parse variable declaration"
-                "VarDecl (Var {vName = \"my_val\", vType = TypeNative \"auto\"}) (Binary (OR (Bool False) (Unary (NOT (Bool True)))))"
-                (readProg " auto my_val = false or not true  ; ")
+                "VarDecl (Var {vName = \"my_val\", vType = TypeNative \"auto\"}) (Binary (OR (Binary (OR (Bool False) (Unary (NOT (Bool True))))) (FuncCall \"even\" [Number 1.0])))"
+                (readProg " auto my_val = false or not true or even(1) ; ")
         ),
 
         TestCase (
@@ -63,6 +63,12 @@ tests = TestList [
             assertEqual "parse function declaration with body"
                 "FunDecl {fnName = \"aaa\", fnOutType = TypeNative \"auto\", fnArgs = [], fnBody = Block [RootBlock (Block []),Return (Binary (OR (Bool False) (Bool True)))]}"
                 (readProg " fn \taaa(\n\n\t)\n ->\t auto\n { {\n\r\n} \nret false or true; }")
+        ),
+
+        TestCase (
+            assertEqual "parse while loop with control loop, and func calls"
+                "WhileLoop (Unary (NOT (FuncCall \"even\" [Binary (MOD (Literal \"x\") (FuncCall \"f\" [Binary (PLUS (Literal \"y\") (Number 5.0))]))]))) (Block [WhileLoop (Unary (NOT (FuncCall \"even\" [Literal \"x\"]))) (Block [LoopContinue]),LoopBreak])"
+                (readProg " while\n not\n even(x\n\t % f(y + 5)) {\n  while not even(x) { continue; }\n break; }")
         )
     ]
 

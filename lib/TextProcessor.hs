@@ -103,11 +103,13 @@ parseGenExpr :: Parsec String () FgValue
 parseGenExpr = buildExpressionParser [
        [binary MULT "*" AssocLeft]
       ,[binary DIV "/" AssocLeft]
+      ,[binary MOD "%" AssocLeft]
       ,[binary PLUS "+" AssocLeft]
       ,[binary MINUS "-" AssocLeft]
       ,[binary AND "and" AssocLeft]
       ,[binary OR "or" AssocLeft]
       ,[binary EQU "==" AssocLeft]
+      ,[binary EQU "is" AssocLeft]
       ,[binary LTE "<=" AssocLeft]
       ,[binary LT_ "<" AssocLeft]
       ,[binary GTE ">=" AssocLeft]
@@ -250,12 +252,28 @@ parseFunDecl = do
         ,fnBody=body
     }
 
+parseContinue :: Parser FgInstr
+parseContinue = lexeme (string "continue") >> terminalSymb >> return LoopContinue
+
+parseBreak :: Parser FgInstr
+parseBreak =  lexeme (string "break") >> terminalSymb >> return LoopBreak
+
+parseWhileLoop :: Parser FgInstr
+parseWhileLoop = do
+    lexeme $ string "while"
+    cond <- lexeme parseExpr
+    body <- lexeme parseBlock
+    return $ WhileLoop cond body
+
 parseInstruction :: Parser FgInstr
 parseInstruction = try parseRootBlock
+    <|> try parseContinue
+    <|> try parseBreak
     <|> try parseVariableDecl
     <|> try parseFunDecl
+    <|> try parseWhileLoop
     <|> try parseReturn
-    <|> parseRootExpr;
+    <|> parseRootExpr
 
 parseProgram :: Parser FgInstr
 parseProgram = parseInstruction
