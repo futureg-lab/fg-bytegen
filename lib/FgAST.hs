@@ -7,6 +7,8 @@ data FgValue = Literal String
     | Bool Bool                        -- Literal false | true -> Bool false | true
     | Binary FgBinary
     | Unary FgUnary
+    | NullValue
+    | FuncCall String [FgValue]
     deriving (Show, Eq)
 
 data FgBinary = PLUS FgValue FgValue

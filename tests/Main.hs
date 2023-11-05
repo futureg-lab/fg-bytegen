@@ -19,8 +19,8 @@ tests = TestList [
 
         TestCase (
             assertEqual "simple expression"
-                "Binary (ListGenerator (Number 1.0) (Binary (AND (Unary (Negative (Number 2.0))) (Binary (MULT (Number 3.0) (Binary (MINUS (Literal \"x\") (Number 1.0))))))))"
-                (readExpr "1 .. -2 and 3 * (x - 1)")
+                "Binary (ListGenerator (Number 1.0) (Binary (OR (Binary (AND (Unary (Negative (Number 2.0))) (Binary (MULT (Number 3.0) (Binary (MINUS (Literal \"x\") (Number 1.0))))))) NullValue)))"
+                (readExpr "1 .. -2 and 3 * (x - 1) or null")
         ),
 
         TestCase (

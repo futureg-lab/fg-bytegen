@@ -30,6 +30,7 @@ parseLiteral = let underscore = char '_' in do
     return $ case literal of
         "false" -> Bool False
         "true"  -> Bool True
+        "null"  -> NullValue
         _       -> Literal literal
 
 
@@ -81,6 +82,19 @@ parseTupKeyValue = do
 parseTup :: Parser FgValue
 parseTup = try parseTupKeyValue <|> parseTupSimple
 
+{- FUNC CALL -}
+
+parseFuncCall :: Parser FgValue
+parseFuncCall = do
+    let argUnit = do
+            item <- lexeme parseExpr
+            void whitespace
+            return item
+    callee <- fromLiteral <$> lexeme parseLiteral
+    lexeme $ char '('
+    args <- sepBy (try argUnit) (char ',')
+    lexeme $ char ')'
+    return $ FuncCall callee args
 
 
 {- BINARY OPERATORS -}
@@ -139,8 +153,9 @@ parseUnaryNegative = do
     lexeme $ Unary . Negative <$> parseFactor
 
 parseUnary :: Parser FgValue
-parseUnary = parseUnarySpacedOp ReprOf "repr_of"
-    <|> parseUnarySpacedOp NOT "not"
+parseUnary = try (parseUnarySpacedOp ReprOf "repr_of")
+    <|> try (parseUnarySpacedOp NOT "not")
+    <|> try parseFuncCall
     <|> parseUnaryNegative
     <|> parseLiteral
     <|> parseString
