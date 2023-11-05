@@ -11,19 +11,11 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            extension: ""
-          - os: windows-latest
-            extension: ".exe"
-
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-haskell@v1
+    - uses: haskell-actions/setup@v2
       with:
         ghc-version: '9.4.7'
         cabal-version: '3.6'
