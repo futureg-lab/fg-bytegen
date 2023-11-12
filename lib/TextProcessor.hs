@@ -15,9 +15,12 @@ whitespace = void $ many space
 lexeme :: Parser a -> Parser a
 lexeme p = whitespace >> p
 
+lexemeVoid :: Parser a -> Parser ()
+lexemeVoid p = void $ whitespace >> p
+
 parseString :: Parser FgValue
 parseString = do
-    lexeme $ char '"'
+    lexemeVoid $ char '"'
     x <- many (noneOf "\"")
     char '"'
     return $ String x
@@ -59,11 +62,11 @@ parseTupSimple = do
             item <- lexeme parseExpr
             void whitespace
             return (Number 0, item)
-    lexeme $ char '['
+    lexemeVoid $ char '['
     whitespace
     items <- lexeme $ sepBy v (char ',')
     whitespace
-    lexeme $ char ']'
+    lexemeVoid $ char ']'
     return $ Tup [(Number (int2Double n), snd (items !! n))| n <- [0 .. length items - 1]]
 
 parseTupKeyValue :: Parser FgValue
@@ -74,9 +77,9 @@ parseTupKeyValue = do
             value <- lexeme parseExpr
             void whitespace
             return (key, value)
-    lexeme $ char '['
+    lexemeVoid $ char '['
     items <- lexeme $ sepBy kv (char ',')
-    lexeme $ char ']'
+    lexemeVoid $ char ']'
     return $ Tup items
 
 parseTup :: Parser FgValue
@@ -91,9 +94,9 @@ parseFuncCall = do
             void whitespace
             return item
     callee <- fromLiteral <$> lexeme parseLiteral
-    lexeme $ char '('
+    lexemeVoid $ char '('
     args <- sepBy (try argUnit) (char ',')
-    lexeme $ char ')'
+    lexemeVoid $ char ')'
     return $ FuncCall callee args
 
 
@@ -187,7 +190,7 @@ parseRootBlock = do
 
 parseReturn :: Parser FgInstr
 parseReturn = do
-    lexeme $ string "ret"
+    lexemeVoid $ string "ret"
     expr <- lexeme parseExpr;
     terminalSymb
     return $ Return expr
@@ -211,22 +214,22 @@ parseVariable = do
 parseVariableDecl :: Parser FgInstr
 parseVariableDecl = do
     var <- lexeme parseVariable
-    lexeme $ char '='
+    lexemeVoid $ char '='
     expr <- parseExpr
     terminalSymb
     return $ VarDecl var expr
 
 parseBlock :: Parser FgBlock
 parseBlock = do
-    lexeme $ char '{'
+    lexemeVoid $ char '{'
     instrs <- many (try parseInstruction)
-    lexeme $ char '}'
+    lexemeVoid $ char '}'
     return $ Block instrs
 
 parseFunDecl :: Parser FgInstr
 parseFunDecl = do
     -- func name
-    lexeme $ string "fn"
+    lexemeVoid $ string "fn"
     many1 $ char ' '
     lit <- fmap fromLiteral (lexeme parseLiteral)
     -- args
@@ -234,11 +237,11 @@ parseFunDecl = do
             item <- lexeme parseVariable
             void whitespace
             return item
-    lexeme $ char '('
+    lexemeVoid $ char '('
     args <- lexeme $ sepBy argUnit (char ',')
-    lexeme $ char ')'
+    lexemeVoid $ char ')'
     -- func output
-    lexeme $ string "->"
+    lexemeVoid $ string "->"
     outType <- lexeme parseType
     -- func body
     let emptyBody = do
@@ -253,17 +256,40 @@ parseFunDecl = do
     }
 
 parseContinue :: Parser FgInstr
-parseContinue = lexeme (string "continue") >> terminalSymb >> return LoopContinue
+parseContinue = lexemeVoid (string "continue") >> terminalSymb >> return LoopContinue
 
 parseBreak :: Parser FgInstr
-parseBreak =  lexeme (string "break") >> terminalSymb >> return LoopBreak
+parseBreak =  lexemeVoid (string "break") >> terminalSymb >> return LoopBreak
 
 parseWhileLoop :: Parser FgInstr
 parseWhileLoop = do
-    lexeme $ string "while"
+    lexemeVoid $ string "while"
     cond <- lexeme parseExpr
     body <- lexeme parseBlock
     return $ WhileLoop cond body
+
+parseForLoop :: Parser FgInstr
+parseForLoop = do
+    let parenthItem = do
+            lexemeVoid $ char '('
+            k <- fromLiteral <$> lexeme parseLiteral
+            lexemeVoid $ char ','
+            v <- fromLiteral <$> lexeme parseLiteral
+            lexemeVoid $ char ')'
+            return (Just k, v)
+    let simpleItem  = do
+            v <- fromLiteral <$> lexeme parseLiteral
+            return (Nothing, v)
+    lexemeVoid $ string "for"
+    (k, v) <- try parenthItem <|> simpleItem
+    lexemeVoid $ string "in"
+    iterator <- lexeme parseExpr
+    body <- lexeme parseBlock
+    return $ ForLoop {
+                 forItem=(k, v)
+                ,forIterator=iterator
+                ,forBlock=body
+            }
 
 parseInstruction :: Parser FgInstr
 parseInstruction = try parseRootBlock
@@ -272,6 +298,7 @@ parseInstruction = try parseRootBlock
     <|> try parseVariableDecl
     <|> try parseFunDecl
     <|> try parseWhileLoop
+    <|> try parseForLoop
     <|> try parseReturn
     <|> parseRootExpr
 

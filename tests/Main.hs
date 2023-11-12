@@ -69,6 +69,12 @@ tests = TestList [
             assertEqual "parse while loop with control loop, and func calls"
                 "WhileLoop (Unary (NOT (FuncCall \"even\" [Binary (MOD (Literal \"x\") (FuncCall \"f\" [Binary (PLUS (Literal \"y\") (Number 5.0))]))]))) (Block [WhileLoop (Unary (NOT (FuncCall \"even\" [Literal \"x\"]))) (Block [LoopContinue]),LoopBreak])"
                 (readProg " while\n not\n even(x\n\t % f(y + 5)) {\n  while not even(x) { continue; }\n break; }")
+        ),
+
+        TestCase (
+            assertEqual "parse for loop with control loop, and func calls"
+                "ForLoop {forItem = (Just \"k\",\"v\"), forIterator = Binary (ListGenerator (Number 0.0) (Number 10.0)), forBlock = Block [ForLoop {forItem = (Nothing,\"k2\"), forIterator = Literal \"list\", forBlock = Block [RootExpr (FuncCall \"print\" [Binary (PLUS (Literal \"k\") (Literal \"k2\")),Literal \"v\"])]}]}"
+                (readProg " for \t( k ,\tv\t )\n   in 0 \n\t.. 10 {\nfor k2 in list { print(k + k2, v)\n; }\n}")
         )
     ]
 
