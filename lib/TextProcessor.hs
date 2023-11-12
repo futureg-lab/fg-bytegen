@@ -85,6 +85,14 @@ parseTupKeyValue = do
 parseTup :: Parser FgValue
 parseTup = try parseTupKeyValue <|> parseTupSimple
 
+parseTupIndexAccess :: Parser FgValue
+parseTupIndexAccess = do
+    name <- fromLiteral <$> parseLiteral
+    lexemeVoid $ char '['
+    items <- lexeme $ sepBy parseExpr (char ',')
+    lexemeVoid $ char ']'
+    return $ TupIndexAccess name items
+
 {- FUNC CALL -}
 
 parseFuncCall :: Parser FgValue
@@ -161,6 +169,7 @@ parseUnary :: Parser FgValue
 parseUnary = try (parseUnarySpacedOp ReprOf "repr_of")
     <|> try (parseUnarySpacedOp NOT "not")
     <|> try parseFuncCall
+    <|> try parseTupIndexAccess
     <|> parseUnaryNegative
     <|> parseLiteral
     <|> parseString

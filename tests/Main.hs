@@ -16,6 +16,11 @@ tests = TestList [
         ),
         TestCase (assertEqual "parse decimal number" "Number 213.001701" (readExpr "  213.001701")),
         TestCase (assertEqual "empty tup" "Tup []" (readExpr "[\n]")),
+        TestCase (
+            assertEqual "parse tup index access"
+                "TupIndexAccess \"myTup\" [Binary (PLUS (Literal \"x\") (Literal \"y\")),Binary (MULT (Literal \"z\") (Number 4.0)),Number 1234.0]" 
+                (readExpr "myTup[ x+y        , \nz*4,\t1234\t\t]")
+        ),
 
         TestCase (
             assertEqual "simple expression"

@@ -2,6 +2,7 @@ module FgAST where
 
 data FgValue = Literal String
     | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]
+    | TupIndexAccess String [FgValue]         -- [(k1:)?v1, (k2:)?v2, ..]
     | Number Double                    -- 1234, 1.65 ..
     | String String                    -- "(.+)"
     | Bool Bool                        -- Literal false | true -> Bool false | true
