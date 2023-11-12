@@ -300,13 +300,40 @@ parseForLoop = do
                 ,forBlock=body
             }
 
-parseInstruction :: Parser FgInstr
+parseIfStmt :: Parser FgInstr
+parseIfStmt = do
+    lexemeVoid $ string "if"
+    ifCond <- lexeme parseExpr
+    ifBody <- lexeme parseBlock
+    let expandElif = do
+            lexemeVoid $ string "elif"
+            elifCond <- lexeme parseExpr
+            elifBody <- lexeme parseBlock
+            return (elifCond, elifBody)
+    elifs <- many (try expandElif)
+    let withElse = do
+            try $ lexemeVoid $ string "else"
+            els <- lexeme parseBlock
+            return $ IfStmt {
+                ifBranch=(ifCond, ifBody)
+                ,elifBranches=elifs
+                ,elseBranch=Just els
+            }
+    let withoutElse = do
+            return $ IfStmt {
+                ifBranch=(ifCond, ifBody)
+                ,elifBranches=elifs
+                ,elseBranch=Nothing
+            }
+    try withElse <|> withoutElse
+
 parseInstruction = try parseRootBlock
     <|> try parseContinue
     <|> try parseBreak
     <|> try parseVariableDecl
     <|> try parseFunDecl
     <|> try parseWhileLoop
+    <|> try parseIfStmt
     <|> try parseForLoop
     <|> try parseReturn
     <|> parseRootExpr

@@ -80,6 +80,22 @@ tests = TestList [
             assertEqual "parse for loop with control loop, and func calls"
                 "ForLoop {forItem = (Just \"k\",\"v\"), forIterator = Binary (ListGenerator (Number 0.0) (Number 10.0)), forBlock = Block [ForLoop {forItem = (Nothing,\"k2\"), forIterator = Literal \"list\", forBlock = Block [RootExpr (FuncCall \"print\" [Binary (PLUS (Literal \"k\") (Literal \"k2\")),Literal \"v\"])]}]}"
                 (readProg " for \t( k ,\tv\t )\n   in 0 \n\t.. 10 {\nfor k2 in list { print(k + k2, v)\n; }\n}")
+        ),
+
+        TestCase (
+            assertEqual "simple if statement"
+                "IfStmt {ifBranch = (Binary (OR (Literal \"A\") (Literal \"B\")),Block [RootExpr (FuncCall \"print\" [Literal \"A\"])]), elifBranches = [], elseBranch = Nothing}"
+                (readProg "if\t\nA or B\t {\n print(A); }")
+        ),
+        TestCase (
+            assertEqual "if statement with else branch"
+                "IfStmt {ifBranch = (Binary (OR (Literal \"A\") (Literal \"B\")),Block [RootExpr (FuncCall \"print\" [Literal \"A\"])]), elifBranches = [], elseBranch = Just (Block [RootExpr (FuncCall \"print\" [Literal \"B\"])])}"
+                (readProg "if\t\nA or B\t {\n print(A); } else { print(B); }")
+        ),
+        TestCase (
+            assertEqual "if statement with everything"
+                "IfStmt {ifBranch = (Literal \"x\",Block [RootExpr (Number 1.0)]), elifBranches = [(Literal \"y\",Block [RootExpr (Number 2.0)])], elseBranch = Just (Block [RootExpr (Number 3.0)])}"
+                (readProg "if x \t{ 1; } \telif \n\ty { \n2\t; } else\t { 3; }")
         )
     ]
 
