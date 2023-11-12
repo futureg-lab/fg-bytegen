@@ -312,7 +312,7 @@ parseIfStmt = do
             return (elifCond, elifBody)
     elifs <- many (try expandElif)
     let withElse = do
-            try $ lexemeVoid $ string "else"
+            lexemeVoid $ string "else"
             els <- lexeme parseBlock
             return $ IfStmt {
                 ifBranch=(ifCond, ifBody)
