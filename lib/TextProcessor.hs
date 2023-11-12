@@ -16,7 +16,7 @@ lexeme :: Parser a -> Parser a
 lexeme p = whitespace >> p
 
 lexemeVoid :: Parser a -> Parser ()
-lexemeVoid p = void $ whitespace >> p
+lexemeVoid = void . lexeme
 
 parseString :: Parser FgValue
 parseString = do
