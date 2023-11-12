@@ -15,10 +15,10 @@ stripComments ('/':'*':xs) = dropTillEnd xs
         dropTillEnd (_:xs) = dropTillEnd xs  -- ignore head till "*/"
 
 -- Note: string can contain comment looking tokens
-stripComments ('\"':xs) = '\"' : dropTillEnd xs
+stripComments ('\"':xs) = '\"' : noop xs
     where
-        dropTillEnd [] = []
-        dropTillEnd ('\"':xs) = '\"':stripComments xs
-        dropTillEnd (x:xs) = x:dropTillEnd xs
+        noop [] = []
+        noop ('\"':xs) = '\"':stripComments xs
+        noop (x:xs) = x:noop xs
 
 stripComments (x:xs) = x:stripComments xs
