@@ -8,6 +8,7 @@ import Control.Monad
 import Text.Parsec (Parsec)
 
 import FgAST
+import Sanitizer (stripComments)
 
 whitespace :: Parser ()
 whitespace = void $ many space
@@ -156,7 +157,8 @@ parseFactor = do
 parseUnarySpacedOp :: (FgValue -> FgUnary) -> String -> Parser FgValue
 parseUnarySpacedOp op tk = do
     string tk
-    many1 space
+    space
+    whitespace
     lexeme $ Unary . op <$> parseFactor
 
 parseUnaryNegative :: Parser FgValue
@@ -341,14 +343,13 @@ parseInstruction = try parseRootBlock
 parseProgram :: Parser FgInstr
 parseProgram = parseInstruction
 
-gen :: Parser FgValue -> String -> String
-gen p input = case parse p "unexpected token!" input of
+gen p input = case parse p "unexpected token!" (stripComments input) of
     Left err -> show err
     Right v -> show v
 readExpr :: String -> String
 readExpr = gen parseExpr
 
 readProg :: String -> String
-readProg input = case parse parseProgram "unexpected token!" input of
+readProg input = case parse parseProgram "unexpected token!" (stripComments input) of
     Left err -> show err
     Right v -> show v

@@ -7,7 +7,7 @@ import qualified System.Exit as Exit
 
 tests :: Test
 tests = TestList [
-        TestCase (assertEqual "parse string" "String \"Hello\"" (readExpr "\"Hello\"  ")),
+        TestCase (assertEqual "parse string" "String \"Hello/**/\"" (readExpr "\"Hello/**/\"  ")),
         TestCase (assertEqual "parse simple number" "Unary (Negative (Unary (Negative (Tup []))))" (readExpr " - - [  ]")),
         TestCase (
             assertEqual "parse unary operator"
@@ -95,7 +95,7 @@ tests = TestList [
         TestCase (
             assertEqual "if statement with everything"
                 "IfStmt {ifBranch = (Literal \"x\",Block [RootExpr (Number 1.0)]), elifBranches = [(Literal \"y\",Block [RootExpr (Number 2.0)])], elseBranch = Just (Block [RootExpr (Number 3.0)])}"
-                (readProg "if x \t{ 1; } \telif \n\ty { \n2\t; } else\t { 3; }")
+                (readProg "if x \t{ 1; } \telif \n\ty { \n2\t;//some comments\r\n } /*1234 /*some \ncomments */else\t { 3; }")
         )
     ]
 
