@@ -8,6 +8,11 @@ import qualified System.Exit as Exit
 tests :: Test
 tests = TestList [
         TestCase (assertEqual "parse string" "String \"Hello/**/\"" (readExpr "\"Hello/**/\"  ")),
+        TestCase (
+            assertEqual "parse string with special characters"
+                "String \"\\30000\\20013\\12373\\12435, Mr. Middle Of The Rice Field (\\31505)\\129299\"" 
+                (readExpr "\"田中さん, Mr. Middle Of The Rice Field (笑)🤓\"")
+        ),
         TestCase (assertEqual "parse simple number" "Unary (Negative (Unary (Negative (Tup []))))" (readExpr " - - [  ]")),
         TestCase (
             assertEqual "parse unary operator"
