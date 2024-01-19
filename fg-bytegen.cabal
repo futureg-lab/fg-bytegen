@@ -22,7 +22,7 @@ maintainer:         afmichael73@gmail.com
 extra-source-files: CHANGELOG.md
 
 library text-processor
-    exposed-modules: TextProcessor, FgAST
+    exposed-modules: TextProcessor, Sanitizer, FgAST
     hs-source-dirs: lib
     build-depends:
         base ^>=4.17.2.0

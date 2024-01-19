@@ -2,11 +2,14 @@ module FgAST where
 
 data FgValue = Literal String
     | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]
+    | TupIndexAccess String [FgValue]  -- lit[expr2, expr2, .., exprN]
     | Number Double                    -- 1234, 1.65 ..
     | String String                    -- "(.+)"
     | Bool Bool                        -- Literal false | true -> Bool false | true
     | Binary FgBinary
     | Unary FgUnary
+    | NullValue
+    | FuncCall String [FgValue]
     deriving (Show, Eq)
 
 data FgBinary = PLUS FgValue FgValue
@@ -23,7 +26,7 @@ data FgBinary = PLUS FgValue FgValue
     | OR FgValue FgValue
     | AND FgValue FgValue
     | XOR FgValue FgValue
-    | IN (FgValue, FgValue) FgValue  -- k, v in x
+    | MOD FgValue FgValue
     | ListGenerator FgValue FgValue  -- a .. b
     deriving (Show, Eq)
 
@@ -41,15 +44,33 @@ newtype FgBlock = Block [FgInstr]
 data FgVariable = Var { vName :: String, vType :: FgType }
     deriving (Show, Eq)
 
-
-data FgInstr = RootExpr FgValue
-    | RootBlock FgBlock
-    | Return FgValue
-    | VarDecl FgVariable FgValue
-    | FunDecl {
+data FgFunc = Func {
              fnName :: String
             ,fnOutType :: FgType
             ,fnArgs :: [FgVariable]
-            ,fnBody :: FgBlock
+            ,fnBody :: Maybe FgBlock
         }
+    deriving (Show, Eq)
+
+data FgInstr = RootExpr FgValue
+    | Import String -- import "a/b/file.fg";
+    | Extern FgFunc -- extern fn foo(..) -> ..; // empty body
+    | Expose FgFunc -- expose fn foo(..) -> .. {..};
+    | RootBlock FgBlock
+    | Return FgValue
+    | VarDecl FgVariable FgValue
+    | WhileLoop FgValue FgBlock
+    | ForLoop {
+         forItem:: (Maybe String, String)
+        ,forIterator :: FgValue
+        ,forBlock :: FgBlock
+    }
+    | FuncDef FgFunc
+    | IfStmt {
+             ifBranch :: (FgValue, FgBlock)
+            ,elifBranches :: [(FgValue, FgBlock)]
+            ,elseBranch :: Maybe FgBlock
+        }
+    | LoopBreak
+    | LoopContinue
     deriving (Show, Eq)

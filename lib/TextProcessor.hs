@@ -4,12 +4,11 @@ module TextProcessor where
 import Text.ParserCombinators.Parsec hiding (spaces)
 import GHC.Float
 import Text.Parsec.Expr
-
-import FgAST
-
-
 import Control.Monad
 import Text.Parsec (Parsec)
+
+import FgAST
+import Sanitizer (stripComments)
 
 whitespace :: Parser ()
 whitespace = void $ many space
@@ -17,9 +16,12 @@ whitespace = void $ many space
 lexeme :: Parser a -> Parser a
 lexeme p = whitespace >> p
 
+lexemeVoid :: Parser a -> Parser ()
+lexemeVoid = void . lexeme
+
 parseString :: Parser FgValue
 parseString = do
-    lexeme $ char '"'
+    lexemeVoid $ char '"'
     x <- many (noneOf "\"")
     char '"'
     return $ String x
@@ -32,6 +34,7 @@ parseLiteral = let underscore = char '_' in do
     return $ case literal of
         "false" -> Bool False
         "true"  -> Bool True
+        "null"  -> NullValue
         _       -> Literal literal
 
 
@@ -60,11 +63,11 @@ parseTupSimple = do
             item <- lexeme parseExpr
             void whitespace
             return (Number 0, item)
-    lexeme $ char '['
+    lexemeVoid $ char '['
     whitespace
     items <- lexeme $ sepBy v (char ',')
     whitespace
-    lexeme $ char ']'
+    lexemeVoid $ char ']'
     return $ Tup [(Number (int2Double n), snd (items !! n))| n <- [0 .. length items - 1]]
 
 parseTupKeyValue :: Parser FgValue
@@ -75,14 +78,35 @@ parseTupKeyValue = do
             value <- lexeme parseExpr
             void whitespace
             return (key, value)
-    lexeme $ char '['
+    lexemeVoid $ char '['
     items <- lexeme $ sepBy kv (char ',')
-    lexeme $ char ']'
+    lexemeVoid $ char ']'
     return $ Tup items
 
 parseTup :: Parser FgValue
 parseTup = try parseTupKeyValue <|> parseTupSimple
 
+parseTupIndexAccess :: Parser FgValue
+parseTupIndexAccess = do
+    name <- fromLiteral <$> parseLiteral
+    lexemeVoid $ char '['
+    items <- lexeme $ sepBy parseExpr (char ',')
+    lexemeVoid $ char ']'
+    return $ TupIndexAccess name items
+
+{- FUNC CALL -}
+
+parseFuncCall :: Parser FgValue
+parseFuncCall = do
+    let argUnit = do
+            item <- lexeme parseExpr
+            void whitespace
+            return item
+    callee <- fromLiteral <$> lexeme parseLiteral
+    lexemeVoid $ char '('
+    args <- sepBy (try argUnit) (char ',')
+    lexemeVoid $ char ')'
+    return $ FuncCall callee args
 
 
 {- BINARY OPERATORS -}
@@ -91,11 +115,13 @@ parseGenExpr :: Parsec String () FgValue
 parseGenExpr = buildExpressionParser [
        [binary MULT "*" AssocLeft]
       ,[binary DIV "/" AssocLeft]
+      ,[binary MOD "%" AssocLeft]
       ,[binary PLUS "+" AssocLeft]
       ,[binary MINUS "-" AssocLeft]
       ,[binary AND "and" AssocLeft]
       ,[binary OR "or" AssocLeft]
       ,[binary EQU "==" AssocLeft]
+      ,[binary EQU "is" AssocLeft]
       ,[binary LTE "<=" AssocLeft]
       ,[binary LT_ "<" AssocLeft]
       ,[binary GTE ">=" AssocLeft]
@@ -131,7 +157,8 @@ parseFactor = do
 parseUnarySpacedOp :: (FgValue -> FgUnary) -> String -> Parser FgValue
 parseUnarySpacedOp op tk = do
     string tk
-    many1 space
+    space
+    whitespace
     lexeme $ Unary . op <$> parseFactor
 
 parseUnaryNegative :: Parser FgValue
@@ -141,8 +168,10 @@ parseUnaryNegative = do
     lexeme $ Unary . Negative <$> parseFactor
 
 parseUnary :: Parser FgValue
-parseUnary = parseUnarySpacedOp ReprOf "repr_of"
-    <|> parseUnarySpacedOp NOT "not"
+parseUnary = try (parseUnarySpacedOp ReprOf "repr_of")
+    <|> try (parseUnarySpacedOp NOT "not")
+    <|> try parseFuncCall
+    <|> try parseTupIndexAccess
     <|> parseUnaryNegative
     <|> parseLiteral
     <|> parseString
@@ -172,7 +201,7 @@ parseRootBlock = do
 
 parseReturn :: Parser FgInstr
 parseReturn = do
-    lexeme $ string "ret"
+    lexemeVoid $ string "ret"
     expr <- lexeme parseExpr;
     terminalSymb
     return $ Return expr
@@ -180,6 +209,25 @@ parseReturn = do
 fromLiteral :: FgValue -> String
 fromLiteral (Literal x) = x
 fromLiteral _ = error "fatal: failed unwrapping non-literal token"
+
+parseImport :: Parser FgInstr
+parseImport = do
+    lexemeVoid $ string "import"
+    space
+    whitespace
+    (String path) <- parseString
+    terminalSymb
+    return $ Import path
+
+parseExtern :: Parser FgInstr
+parseExtern = do
+    lexemeVoid $ string "extern"
+    space >> Extern <$> parseFun
+
+parseExpose :: Parser FgInstr
+parseExpose = do
+    lexemeVoid $ string "expose"
+    space >> Expose <$> parseFun
 
 parseType :: Parser FgType
 parseType = do
@@ -196,22 +244,22 @@ parseVariable = do
 parseVariableDecl :: Parser FgInstr
 parseVariableDecl = do
     var <- lexeme parseVariable
-    lexeme $ char '='
+    lexemeVoid $ char '='
     expr <- parseExpr
     terminalSymb
     return $ VarDecl var expr
 
 parseBlock :: Parser FgBlock
 parseBlock = do
-    lexeme $ char '{'
+    lexemeVoid $ char '{'
     instrs <- many (try parseInstruction)
-    lexeme $ char '}'
+    lexemeVoid $ char '}'
     return $ Block instrs
 
-parseFunDecl :: Parser FgInstr
-parseFunDecl = do
+parseFun :: Parser FgFunc
+parseFun = do
     -- func name
-    lexeme $ string "fn"
+    lexemeVoid $ string "fn"
     many1 $ char ' '
     lit <- fmap fromLiteral (lexeme parseLiteral)
     -- args
@@ -219,42 +267,114 @@ parseFunDecl = do
             item <- lexeme parseVariable
             void whitespace
             return item
-    lexeme $ char '('
+    lexemeVoid $ char '('
     args <- lexeme $ sepBy argUnit (char ',')
-    lexeme $ char ')'
+    lexemeVoid $ char ')'
     -- func output
-    lexeme $ string "->"
+    lexemeVoid $ string "->"
     outType <- lexeme parseType
     -- func body
     let emptyBody = do
             terminalSymb
-            return $ Block []
-    body <- try parseBlock <|> emptyBody
-    return $ FunDecl {
+            return Nothing
+    body <- (Just <$> try parseBlock) <|> emptyBody
+    return $ Func {
          fnName=lit
         ,fnOutType=outType
         ,fnArgs=args
         ,fnBody=body
     }
 
-parseInstruction :: Parser FgInstr
-parseInstruction = try parseRootBlock
+parseFunDef :: Parser FgInstr
+parseFunDef = FuncDef <$> parseFun
+
+parseContinue :: Parser FgInstr
+parseContinue = lexemeVoid (string "continue") >> terminalSymb >> return LoopContinue
+
+parseBreak :: Parser FgInstr
+parseBreak =  lexemeVoid (string "break") >> terminalSymb >> return LoopBreak
+
+parseWhileLoop :: Parser FgInstr
+parseWhileLoop = do
+    lexemeVoid $ string "while"
+    cond <- lexeme parseExpr
+    body <- lexeme parseBlock
+    return $ WhileLoop cond body
+
+parseForLoop :: Parser FgInstr
+parseForLoop = do
+    let parenthItem = do
+            lexemeVoid $ char '('
+            k <- fromLiteral <$> lexeme parseLiteral
+            lexemeVoid $ char ','
+            v <- fromLiteral <$> lexeme parseLiteral
+            lexemeVoid $ char ')'
+            return (Just k, v)
+    let simpleItem  = do
+            v <- fromLiteral <$> lexeme parseLiteral
+            return (Nothing, v)
+    lexemeVoid $ string "for"
+    (k, v) <- try parenthItem <|> simpleItem
+    lexemeVoid $ string "in"
+    iterator <- lexeme parseExpr
+    body <- lexeme parseBlock
+    return $ ForLoop {
+                 forItem=(k, v)
+                ,forIterator=iterator
+                ,forBlock=body
+            }
+
+parseIfStmt :: Parser FgInstr
+parseIfStmt = do
+    lexemeVoid $ string "if"
+    ifCond <- lexeme parseExpr
+    ifBody <- lexeme parseBlock
+    let expandElif = do
+            lexemeVoid $ string "elif"
+            elifCond <- lexeme parseExpr
+            elifBody <- lexeme parseBlock
+            return (elifCond, elifBody)
+    elifs <- many (try expandElif)
+    let withElse = do
+            lexemeVoid $ string "else"
+            els <- lexeme parseBlock
+            return $ IfStmt {
+                ifBranch=(ifCond, ifBody)
+                ,elifBranches=elifs
+                ,elseBranch=Just els
+            }
+    let withoutElse = do
+            return $ IfStmt {
+                ifBranch=(ifCond, ifBody)
+                ,elifBranches=elifs
+                ,elseBranch=Nothing
+            }
+    try withElse <|> withoutElse
+
+parseInstruction = try parseImport
+    <|> try parseExtern
+    <|> try parseExpose
+    <|> try parseRootBlock
+    <|> try parseContinue
+    <|> try parseBreak
     <|> try parseVariableDecl
-    <|> try parseFunDecl
+    <|> try parseFunDef
+    <|> try parseWhileLoop
+    <|> try parseIfStmt
+    <|> try parseForLoop
     <|> try parseReturn
-    <|> parseRootExpr;
+    <|> parseRootExpr
 
 parseProgram :: Parser FgInstr
 parseProgram = parseInstruction
 
-gen :: Parser FgValue -> String -> String
-gen p input = case parse p "unexpected token!" input of
+gen p input = case parse p "unexpected token!" (stripComments input) of
     Left err -> show err
     Right v -> show v
 readExpr :: String -> String
 readExpr = gen parseExpr
 
 readProg :: String -> String
-readProg input = case parse parseProgram "unexpected token!" input of
+readProg input = case parse parseProgram "unexpected token!" (stripComments input) of
     Left err -> show err
     Right v -> show v

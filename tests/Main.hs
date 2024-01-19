@@ -7,7 +7,12 @@ import qualified System.Exit as Exit
 
 tests :: Test
 tests = TestList [
-        TestCase (assertEqual "parse string" "String \"Hello\"" (readExpr "\"Hello\"  ")),
+        TestCase (assertEqual "parse string" "String \"Hello/**/\"" (readExpr "\"Hello/**/\"  ")),
+        TestCase (
+            assertEqual "parse string with variable-width characters"
+                "String \"\\30000\\20013\\12373\\12435, Mr. Middle Of The Rice Field (\\31505)\\129299\"" 
+                (readExpr "\"田中さん, Mr. Middle Of The Rice Field (笑)🤓\"")
+        ),
         TestCase (assertEqual "parse simple number" "Unary (Negative (Unary (Negative (Tup []))))" (readExpr " - - [  ]")),
         TestCase (
             assertEqual "parse unary operator"
@@ -16,11 +21,16 @@ tests = TestList [
         ),
         TestCase (assertEqual "parse decimal number" "Number 213.001701" (readExpr "  213.001701")),
         TestCase (assertEqual "empty tup" "Tup []" (readExpr "[\n]")),
+        TestCase (
+            assertEqual "parse tup index access"
+                "TupIndexAccess \"myTup\" [Binary (PLUS (Literal \"x\") (Literal \"y\")),Binary (MULT (Literal \"z\") (Number 4.0)),Number 1234.0]" 
+                (readExpr "myTup[ x+y        , \nz*4,\t1234\t\t]")
+        ),
 
         TestCase (
             assertEqual "simple expression"
-                "Binary (ListGenerator (Number 1.0) (Binary (AND (Unary (Negative (Number 2.0))) (Binary (MULT (Number 3.0) (Binary (MINUS (Literal \"x\") (Number 1.0))))))))"
-                (readExpr "1 .. -2 and 3 * (x - 1)")
+                "Binary (ListGenerator (Number 1.0) (Binary (OR (Binary (AND (Unary (Negative (Number 2.0))) (Binary (MULT (Number 3.0) (Binary (MINUS (Literal \"x\") (Number 1.0))))))) NullValue)))"
+                (readExpr "1 .. -2 and 3 * (x - 1) or null")
         ),
 
         TestCase (
@@ -43,8 +53,8 @@ tests = TestList [
 
         TestCase (
             assertEqual "parse variable declaration"
-                "VarDecl (Var {vName = \"my_val\", vType = TypeNative \"auto\"}) (Binary (OR (Bool False) (Unary (NOT (Bool True)))))"
-                (readProg " auto my_val = false or not true  ; ")
+                "VarDecl (Var {vName = \"my_val\", vType = TypeNative \"auto\"}) (Binary (OR (Binary (OR (Bool False) (Unary (NOT (Bool True))))) (FuncCall \"even\" [Number 1.0])))"
+                (readProg " auto my_val = false or not true or even(1) ; ")
         ),
 
         TestCase (
@@ -55,14 +65,57 @@ tests = TestList [
 
         TestCase (
             assertEqual "parse function declaration"
-                "FunDecl {fnName = \"hello\", fnOutType = TypeNative \"auto\", fnArgs = [Var {vName = \"name\", vType = TypeNative \"str\"},Var {vName = \"age\", vType = TypeNative \"num\"}], fnBody = Block []}"
+                "FuncDef (Func {fnName = \"hello\", fnOutType = TypeNative \"auto\", fnArgs = [Var {vName = \"name\", vType = TypeNative \"str\"},Var {vName = \"age\", vType = TypeNative \"num\"}], fnBody = Nothing})"
                 (readProg " fn  \nhello(\n str name ,\nnum age) -> auto\n;")
         ),
 
         TestCase (
             assertEqual "parse function declaration with body"
-                "FunDecl {fnName = \"aaa\", fnOutType = TypeNative \"auto\", fnArgs = [], fnBody = Block [RootBlock (Block []),Return (Binary (OR (Bool False) (Bool True)))]}"
+                "FuncDef (Func {fnName = \"aaa\", fnOutType = TypeNative \"auto\", fnArgs = [], fnBody = Just (Block [RootBlock (Block []),Return (Binary (OR (Bool False) (Bool True)))])})"
                 (readProg " fn \taaa(\n\n\t)\n ->\t auto\n { {\n\r\n} \nret false or true; }")
+        ),
+
+        TestCase (
+            assertEqual "parse while loop with control loop, and func calls"
+                "WhileLoop (Unary (NOT (FuncCall \"even\" [Binary (MOD (Literal \"x\") (FuncCall \"f\" [Binary (PLUS (Literal \"y\") (Number 5.0))]))]))) (Block [WhileLoop (Unary (NOT (FuncCall \"even\" [Literal \"x\"]))) (Block [LoopContinue]),LoopBreak])"
+                (readProg " while\n not\n even(x\n\t % f(y + 5)) {\n  while not even(x) { continue; }\n break; }")
+        ),
+
+        TestCase (
+            assertEqual "parse for loop with control loop, and func calls"
+                "ForLoop {forItem = (Just \"k\",\"v\"), forIterator = Binary (ListGenerator (Number 0.0) (Number 10.0)), forBlock = Block [ForLoop {forItem = (Nothing,\"k2\"), forIterator = Literal \"list\", forBlock = Block [RootExpr (FuncCall \"print\" [Binary (PLUS (Literal \"k\") (Literal \"k2\")),Literal \"v\"])]}]}"
+                (readProg " for \t( k ,\tv\t )\n   in 0 \n\t.. 10 {\nfor k2 in list { print(k + k2, v)\n; }\n}")
+        ),
+
+        TestCase (
+            assertEqual "simple if statement"
+                "IfStmt {ifBranch = (Binary (OR (Literal \"A\") (Literal \"B\")),Block [RootExpr (FuncCall \"print\" [Literal \"A\"])]), elifBranches = [], elseBranch = Nothing}"
+                (readProg "if\t\nA or B\t {\n print(A); }")
+        ),
+        TestCase (
+            assertEqual "if statement with else branch"
+                "IfStmt {ifBranch = (Binary (OR (Literal \"A\") (Literal \"B\")),Block [RootExpr (FuncCall \"print\" [Literal \"A\"])]), elifBranches = [], elseBranch = Just (Block [RootExpr (FuncCall \"print\" [Literal \"B\"])])}"
+                (readProg "if\t\nA or B\t {\n print(A); } else { print(B); }")
+        ),
+        TestCase (
+            assertEqual "if statement with everything"
+                "IfStmt {ifBranch = (Literal \"x\",Block [RootExpr (Number 1.0)]), elifBranches = [(Literal \"y\",Block [RootExpr (Number 2.0)])], elseBranch = Just (Block [RootExpr (Number 3.0)])}"
+                (readProg "if x \t{ 1; } \telif \n\ty { \n2\t;//some comments\r\n } /*1234 /*some \ncomments */else\t { 3; }")
+        ),
+        TestCase (
+            assertEqual "import statement"
+                "Import \"path/to/file.fg\""
+                (readProg "import /*comments*/  \n\t\"path/to/file.fg\"\n\t /*comments2*/; // comments3")
+        ),
+        TestCase (
+            assertEqual "extern statement"
+                "Extern (Func {fnName = \"isEven\", fnOutType = TypeNative \"bool\", fnArgs = [Var {vName = \"_\", vType = TypeNative \"num\"}], fnBody = Nothing})"
+                (readProg "extern /*comments*/ \t fn isEven(num _) \n-> bool;")
+        ),
+        TestCase (
+            assertEqual "extern statement"
+                "Expose (Func {fnName = \"main\", fnOutType = TypeNative \"bool\", fnArgs = [], fnBody = Just (Block [RootExpr (FuncCall \"hello\" [String \"World\"])])})"
+                (readProg "expose /*comments*/ \t fn main() \n-> bool {\n hello(\"World\"); }")
         )
     ]
 
