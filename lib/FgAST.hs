@@ -44,9 +44,18 @@ newtype FgBlock = Block [FgInstr]
 data FgVariable = Var { vName :: String, vType :: FgType }
     deriving (Show, Eq)
 
+data FgFunc = Func {
+             fnName :: String
+            ,fnOutType :: FgType
+            ,fnArgs :: [FgVariable]
+            ,fnBody :: Maybe FgBlock
+        }
+    deriving (Show, Eq)
 
 data FgInstr = RootExpr FgValue
-    | ImportExpr String -- import "a/b/file.fg";
+    | Import String -- import "a/b/file.fg";
+    | Extern FgFunc -- extern fn foo(..) -> ..; // empty body
+    | Expose FgFunc -- expose fn foo(..) -> .. {..};
     | RootBlock FgBlock
     | Return FgValue
     | VarDecl FgVariable FgValue
@@ -56,12 +65,7 @@ data FgInstr = RootExpr FgValue
         ,forIterator :: FgValue
         ,forBlock :: FgBlock
     }
-    | FunDecl {
-             fnName :: String
-            ,fnOutType :: FgType
-            ,fnArgs :: [FgVariable]
-            ,fnBody :: FgBlock
-        }
+    | FuncDef FgFunc
     | IfStmt {
              ifBranch :: (FgValue, FgBlock)
             ,elifBranches :: [(FgValue, FgBlock)]

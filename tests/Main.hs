@@ -106,6 +106,16 @@ tests = TestList [
             assertEqual "import statement"
                 "ImportExpr \"path/to/file.fg\""
                 (readProg "import /*comments*/  \n\t\"path/to/file.fg\"\n\t /*comments2*/; // comments3")
+        ),
+        TestCase (
+            assertEqual "extern statement"
+                "Extern (Func {fnName = \"isEven\", fnOutType = TypeNative \"bool\", fnArgs = [Var {vName = \"_\", vType = TypeNative \"num\"}], fnBody = Nothing})"
+                (readProg "extern /*comments*/ \t fn isEven(num _) \n-> bool;")
+        ),
+        TestCase (
+            assertEqual "extern statement"
+                "Extern (Func {fnName = \"main\", fnOutType = TypeNative \"bool\", fnArgs = [], fnBody = Just (Block [RootExpr (FuncCall \"hello\" [String \"World\"])])})"
+                (readProg "expose /*comments*/ \t fn main() \n-> bool {\n hello(\"World\"); }")
         )
     ]
 

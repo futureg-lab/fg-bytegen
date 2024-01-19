@@ -217,7 +217,17 @@ parseImport = do
     whitespace
     (String path) <- parseString
     terminalSymb
-    return $ ImportExpr path
+    return $ Import path
+
+parseExtern :: Parser FgInstr
+parseExtern = do
+    lexemeVoid $ string "extern"
+    space >> Extern <$> parseFun
+
+parseExpose :: Parser FgInstr
+parseExpose = do
+    lexemeVoid $ string "expose"
+    space >> Expose <$> parseFun
 
 parseType :: Parser FgType
 parseType = do
@@ -246,8 +256,8 @@ parseBlock = do
     lexemeVoid $ char '}'
     return $ Block instrs
 
-parseFunDecl :: Parser FgInstr
-parseFunDecl = do
+parseFun :: Parser FgFunc
+parseFun = do
     -- func name
     lexemeVoid $ string "fn"
     many1 $ char ' '
@@ -266,14 +276,17 @@ parseFunDecl = do
     -- func body
     let emptyBody = do
             terminalSymb
-            return $ Block []
-    body <- try parseBlock <|> emptyBody
-    return $ FunDecl {
+            return Nothing
+    body <- (Just <$> try parseBlock) <|> emptyBody
+    return $ Func {
          fnName=lit
         ,fnOutType=outType
         ,fnArgs=args
         ,fnBody=body
     }
+
+parseFunDef :: Parser FgInstr
+parseFunDef = FuncDef <$> parseFun
 
 parseContinue :: Parser FgInstr
 parseContinue = lexemeVoid (string "continue") >> terminalSymb >> return LoopContinue
@@ -339,11 +352,13 @@ parseIfStmt = do
     try withElse <|> withoutElse
 
 parseInstruction = try parseImport
+    <|> try parseExtern
+    <|> try parseExpose
     <|> try parseRootBlock
     <|> try parseContinue
     <|> try parseBreak
     <|> try parseVariableDecl
-    <|> try parseFunDecl
+    <|> try parseFunDef
     <|> try parseWhileLoop
     <|> try parseIfStmt
     <|> try parseForLoop
