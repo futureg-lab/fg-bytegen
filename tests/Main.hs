@@ -65,13 +65,13 @@ tests = TestList [
 
         TestCase (
             assertEqual "parse function declaration"
-                "FunDecl {fnName = \"hello\", fnOutType = TypeNative \"auto\", fnArgs = [Var {vName = \"name\", vType = TypeNative \"str\"},Var {vName = \"age\", vType = TypeNative \"num\"}], fnBody = Block []}"
+                "FuncDef (Func {fnName = \"hello\", fnOutType = TypeNative \"auto\", fnArgs = [Var {vName = \"name\", vType = TypeNative \"str\"},Var {vName = \"age\", vType = TypeNative \"num\"}], fnBody = Nothing})"
                 (readProg " fn  \nhello(\n str name ,\nnum age) -> auto\n;")
         ),
 
         TestCase (
             assertEqual "parse function declaration with body"
-                "FunDecl {fnName = \"aaa\", fnOutType = TypeNative \"auto\", fnArgs = [], fnBody = Block [RootBlock (Block []),Return (Binary (OR (Bool False) (Bool True)))]}"
+                "FuncDef (Func {fnName = \"aaa\", fnOutType = TypeNative \"auto\", fnArgs = [], fnBody = Just (Block [RootBlock (Block []),Return (Binary (OR (Bool False) (Bool True)))])})"
                 (readProg " fn \taaa(\n\n\t)\n ->\t auto\n { {\n\r\n} \nret false or true; }")
         ),
 
@@ -104,7 +104,7 @@ tests = TestList [
         ),
         TestCase (
             assertEqual "import statement"
-                "ImportExpr \"path/to/file.fg\""
+                "Import \"path/to/file.fg\""
                 (readProg "import /*comments*/  \n\t\"path/to/file.fg\"\n\t /*comments2*/; // comments3")
         ),
         TestCase (
@@ -114,7 +114,7 @@ tests = TestList [
         ),
         TestCase (
             assertEqual "extern statement"
-                "Extern (Func {fnName = \"main\", fnOutType = TypeNative \"bool\", fnArgs = [], fnBody = Just (Block [RootExpr (FuncCall \"hello\" [String \"World\"])])})"
+                "Expose (Func {fnName = \"main\", fnOutType = TypeNative \"bool\", fnArgs = [], fnBody = Just (Block [RootExpr (FuncCall \"hello\" [String \"World\"])])})"
                 (readProg "expose /*comments*/ \t fn main() \n-> bool {\n hello(\"World\"); }")
         )
     ]
