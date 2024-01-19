@@ -9,7 +9,7 @@ tests :: Test
 tests = TestList [
         TestCase (assertEqual "parse string" "String \"Hello/**/\"" (readExpr "\"Hello/**/\"  ")),
         TestCase (
-            assertEqual "parse string with special characters"
+            assertEqual "parse string with variable-width characters"
                 "String \"\\30000\\20013\\12373\\12435, Mr. Middle Of The Rice Field (\\31505)\\129299\"" 
                 (readExpr "\"田中さん, Mr. Middle Of The Rice Field (笑)🤓\"")
         ),
@@ -101,6 +101,11 @@ tests = TestList [
             assertEqual "if statement with everything"
                 "IfStmt {ifBranch = (Literal \"x\",Block [RootExpr (Number 1.0)]), elifBranches = [(Literal \"y\",Block [RootExpr (Number 2.0)])], elseBranch = Just (Block [RootExpr (Number 3.0)])}"
                 (readProg "if x \t{ 1; } \telif \n\ty { \n2\t;//some comments\r\n } /*1234 /*some \ncomments */else\t { 3; }")
+        ),
+        TestCase (
+            assertEqual "import statement"
+                "ImportExpr \"path/to/file.fg\""
+                (readProg "import /*comments*/  \n\t\"path/to/file.fg\"\n\t /*comments2*/; // comments3")
         )
     ]
 

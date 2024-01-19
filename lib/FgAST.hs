@@ -46,6 +46,7 @@ data FgVariable = Var { vName :: String, vType :: FgType }
 
 
 data FgInstr = RootExpr FgValue
+    | ImportExpr String -- import "a/b/file.fg";
     | RootBlock FgBlock
     | Return FgValue
     | VarDecl FgVariable FgValue

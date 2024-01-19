@@ -210,6 +210,15 @@ fromLiteral :: FgValue -> String
 fromLiteral (Literal x) = x
 fromLiteral _ = error "fatal: failed unwrapping non-literal token"
 
+parseImport :: Parser FgInstr
+parseImport = do
+    lexemeVoid $ string "import"
+    space
+    whitespace
+    (String path) <- parseString
+    terminalSymb
+    return $ ImportExpr path
+
 parseType :: Parser FgType
 parseType = do
     lit <- fromLiteral <$> lexeme parseLiteral
@@ -329,7 +338,8 @@ parseIfStmt = do
             }
     try withElse <|> withoutElse
 
-parseInstruction = try parseRootBlock
+parseInstruction = try parseImport
+    <|> try parseRootBlock
     <|> try parseContinue
     <|> try parseBreak
     <|> try parseVariableDecl
