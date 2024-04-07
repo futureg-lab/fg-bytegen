@@ -22,6 +22,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: freckle/stack-action@v5
+      with:
+        stack-build-arguments: --fast # default: --fast --pedantic
 
     # - name: Install dependencies
     #   run: |
