@@ -1,4 +1,4 @@
-module FgAST where
+module FgAST (FgAST) where
 
 data FgValue = Literal String
     | Tup [(FgValue, FgValue)]         -- [(k1:)?v1, (k2:)?v2, ..]

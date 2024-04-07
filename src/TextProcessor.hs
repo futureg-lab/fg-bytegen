@@ -367,9 +367,11 @@ parseInstruction = try parseImport
 parseProgram :: Parser FgInstr
 parseProgram = parseInstruction
 
+gen :: Show a => Parsec String () a -> String -> String
 gen p input = case parse p "unexpected token!" (stripComments input) of
     Left err -> show err
     Right v -> show v
+
 readExpr :: String -> String
 readExpr = gen parseExpr
 
