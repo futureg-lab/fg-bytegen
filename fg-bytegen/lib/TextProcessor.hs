@@ -1,5 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
-module TextProcessor where
+module TextProcessor (TextProcessor) where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
 import GHC.Float
