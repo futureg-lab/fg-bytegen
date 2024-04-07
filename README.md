@@ -10,5 +10,5 @@ fg-script lang bytecode/IR emitter
 
 stack test
 # stack build --fast
-stack run "fn add(num a, num b) -> str { ret str(a + b); }"
+stack run debug "fn add(num a, num b) -> str { ret str(a + b); }"
 ```
