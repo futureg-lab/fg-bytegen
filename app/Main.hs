@@ -15,15 +15,15 @@ runGen args = print $ "gen " ++ show args
 
 runOp :: String -> [String] -> IO ()
 runOp action args = do
-    case action of
-        "debug" -> hsDebug (unwords args)
-        "gen" -> runGen args
-        _ -> badCommand (unwords (action:args))
+  case action of
+    "debug" -> hsDebug (unwords args)
+    "gen" -> runGen args
+    _ -> badCommand (unwords (action : args))
 
 main :: IO ()
 main = do
-    cliArgs <- getArgs
-    case cliArgs of
-        [] -> help
-        [c] -> if c == "-h" || c == "--help" || c == "help" then help else badCommand c
-        (action:args) -> runOp action args
+  cliArgs <- getArgs
+  case cliArgs of
+    [] -> help
+    [c] -> if c == "-h" || c == "--help" || c == "help" then help else badCommand c
+    (action : args) -> runOp action args
