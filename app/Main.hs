@@ -18,7 +18,7 @@ runOp action args = do
     case action of
         "debug" -> hsDebug (unwords args)
         "gen" -> runGen args
-        _ -> badCommand (concat args)
+        _ -> badCommand (unwords (action:args))
 
 main :: IO ()
 main = do

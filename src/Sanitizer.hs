@@ -1,4 +1,4 @@
-module Sanitizer where
+module Sanitizer (Sanitizer) where
 
 stripComments :: String -> String
 stripComments [] = []
